@@ -22,6 +22,25 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 > ⚠️ **Unofficial.** Neither the Extra Options author nor the Azimuth developer supports this fork.
 > Please do **not** report issues with this fork to them. Report Azimuth bugs only without mods.
 
+## Compatibility
+Tested only with this combination – other versions may not work:
+
+| Part | Version |
+|---|---|
+| Azimuth | **0.9.10** |
+| Extra Options (base) | **0.2.98** |
+| Forza Horizon 2 | Xbox One version 1.0.0.64 (`forza_durango_release_final.exe`) |
+| Wheel | Logitech G920 (other wheels untested) |
+
+A new Azimuth release may break this mod. If Extra Options detects a mismatch it disables itself.
+Updates will follow when possible.
+
+## Credits
+- **[RokkuDayo](https://github.com/RokkuDayo)** – [Extra Options](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions), the base of this fork
+- **[Almost There Games](https://almost-there-games.itch.io/azimuth)** – Azimuth wrapper (not included)
+- **[Flenkii](https://github.com/Flenkii)** – idea, testing, maintainer of this fork
+- **Claude (Anthropic)** – wrote most of the new code in this fork together with Flenkii
+
 ## Not included
 - No Forza Horizon 2 game files (no EXE, no database, no graphics/XAML).
 - No Azimuth – get it from the developer: <https://almost-there-games.itch.io/azimuth>
