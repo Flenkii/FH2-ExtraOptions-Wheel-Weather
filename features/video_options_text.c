@@ -811,3 +811,7 @@ const VideoOptionsText *video_options_text(unsigned char *game_image) {
     }
     return &english;
 }
+
+int video_options_text_is_german(unsigned char *game_image) {
+    return video_options_text(game_image) == &german;
+}

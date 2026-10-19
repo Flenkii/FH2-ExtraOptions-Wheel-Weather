@@ -1,3 +1,4 @@
+#include "weather.h"
 #include "vehicle_controls.h"
 #include "blinkers.h"
 #include "autodrive_game.h"
@@ -558,6 +559,7 @@ static void vehicle_update(void *self, float dt, float frame_dt, unsigned frame)
     }
     if (owned) {
         return_garage_tick();
+        weather_tick();
     }
     autodrive_game_release_car(local_car);
 }

@@ -55,6 +55,12 @@ COMMON_SOURCES = [
     "features/autodrive_ui.c",
     "features/png_validation.c",
     "features/png_decode.c",
+    "features/traffic_tunables.c",
+    "features/wheel_bridge.c",
+    "features/ini_edit.c",
+    "features/rig_settings.c",
+    "features/wheel_buttons.c",
+    "features/weather.c",
 ]
 
 
@@ -187,6 +193,7 @@ def build(compiler, output, directory, options):
             "adapters/azimuth_host.c",
             "adapters/azimuth_save.c",
             "adapters/azimuth_markers.c",
+            "adapters/azimuth_guard.c",
         ]
         if options.azimuth
         else ["adapters/mezcal.c"]

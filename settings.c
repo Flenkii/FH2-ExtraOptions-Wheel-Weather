@@ -25,6 +25,9 @@ const SettingDefinition setting_definitions[] = {
     SETTING("PhotoMode", "FreeCamera", free_photo_camera, SETTING_BOOLEAN),
     SETTING("Files", "EnableMediaOverrides", media_overrides, SETTING_BOOLEAN),
     {"Autodrive", "Enabled", "AutodriveEnabled", offsetof(ModOptions, autodrive), SETTING_BOOLEAN},
+    SETTING("Traffic", "TrafficLevel", traffic_level, SETTING_TRAFFIC_LEVEL),
+    SETTING("Traffic", "RushHourAllDay", traffic_all_day, SETTING_BOOLEAN),
+    SETTING("Traffic", "Wetter", weather, SETTING_WEATHER),
 };
 
 static const SettingDefinition legacy_settings[] = {
@@ -78,6 +81,8 @@ void settings_defaults(ModOptions *options) {
         .enable_clubs = 1,
         .enable_rivals = 1,
         .photo_mode_samples = 0,
+        .traffic_level = 4,
+        .traffic_all_day = 1,
     };
 }
 
@@ -150,6 +155,20 @@ static int parse_value(const SettingDefinition *definition, const char *text, in
         }
         *value = (int)samples;
         return 1;
+    }
+    if (definition->type == SETTING_WEATHER) {
+        if (text[0] >= '0' && text[0] <= '5' && !text[1]) {
+            *value = text[0] - '0';
+            return 1;
+        }
+        return 0;
+    }
+    if (definition->type == SETTING_TRAFFIC_LEVEL) {
+        if (text[0] >= '0' && text[0] <= '5' && !text[1]) {
+            *value = text[0] - '0';
+            return 1;
+        }
+        return 0;
     }
     if (definition->type == SETTING_MSAA) {
         if (text_equal_ignore_case(text, "2")) {

@@ -47,3 +47,7 @@ EXPORTS
     ReleaseSRWLockShared
     AcquireSRWLockExclusive
     ReleaseSRWLockExclusive
+    CreateThread
+    Sleep
+    VirtualAlloc
+    GetFileAttributesExW

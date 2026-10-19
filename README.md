@@ -1,79 +1,63 @@
-# Forza Horizon 2 - Extra Options
-A quality-of-life mod for the Xbox One version of Forza Horizon 2 that adds several tweaks to the game.
+# Forza Horizon 2 – Extra Options + Lenkrad, Verkehr & Wetter (inoffizieller Fork)
 
-# WARNING
-An individual or group of people is trying to use Forza Horizon 2 and the mod's name to perform a scan that adds a keylogger to your computer. There is **NO** "All-In-One" installation tutorial and anything that requires you to insert and run things on your PowerShell is a **scam.**
+Dies ist ein **inoffizieller Fork** von [RokkuDayo/ForzaHorizon2_ExtraOptions](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions)
+(Version 0.2.98) für die Xbox-One-Version von Forza Horizon 2 mit dem Wrapper **Azimuth**.
+Alle Funktionen des Originals sind unverändert enthalten – die Beschreibung dazu steht in
+[README_ORIGINAL.md](README_ORIGINAL.md). Dieser Fork ergänzt:
 
-Note: Issues will be set to "Contributors Only" for a while until I can sort out the situation with scams being spammed there. If you need assistance, you can find official threads for the mod in the ForzaMods and Mezcal Discord servers.
+| Funktion | Kurz erklärt |
+|---|---|
+| **Lenkrad-Brücke (Logitech G920)** | Das Lenkrad wird dem Spiel als Xbox-Lenkrad gemeldet: Lenkung, Pedale, Kupplung, H-Schaltung, Tasten. |
+| **Force Feedback** | Eigene FFB-Berechnung über DirectInput (Kraft aus dem Fahrverhalten, Vibration, Dämpfung, Reibung, Zentrierung …) mit 5 Profilen. |
+| **Freie Lenkrad-Tasten** | RSB, LSB und Xbox-Taste frei belegbar (Blick zurück/links/rechts, Kamera, Handbremse, Radio, Schalten …). |
+| **Menü „Lenkrad & Verkehr“ im Spiel** | Optionen › HUD › ganz unten. Alle Werte wirken sofort und werden gespeichert. |
+| **Mehr Verkehr** | Verkehrsgrenzen bis 100 Autos, Rushhour rund um die Uhr, Voreinstellungen Original/Ruhig/Lebhaft/Rushhour/Chaos. |
+| **Festes Wetter** | Sonnig, Bewölkt, Gewitterwolken, Regen oder Nebel – über die spieleigene Wetter-Steuerung, ohne Spieldateien zu ändern. |
+| **Werkzeuge** (`tools/`) | Skripte für Cockpit-Lenkrad, More-Traffic-Dateien und „Verkehrs-Vielfalt“ (20 zusätzliche Verkehrsmodelle). |
 
-# Features
- - Change your car anywhere.
- - Autodrive (as seen in Forza Horizon 6).
- - Drift Camera (as seen in Forza Horizon 4/5/6).
- - FOV sliders for every camera type.
- - Roof toggle for supported cars during free-roam.
- - Lights, hazards, and turn-signal toggles for all cars.
- - New rim style category with all stock rims.
- - Custom spawn locations.
- - "mediapc" modding folder support.
- 
-# Enhancements
- - Skip developer opening videos.
- - All DLC packs properly unlocked.
- - VIP status & "Treasure Map" unlocks.
- - Toggle for 4K liveries w/ enhanced sampling.
- - Unrestricted Photo Mode.
- - "Return to Garage" button in the pause menu.
- - Aero tuning without equipping Forza Aero parts.
- - New rim style category with all aftermarket rims.
- - Toggle for having the minimap follow the orbit camera.
- - Bypass for Azimuth's save data checks.
- - Custom Gamerpic support.
+> 🚨 **Sicherheit:** Siehe die Warnung des Original-Autors in [README_ORIGINAL.md](README_ORIGINAL.md):
+> Betrüger verbreiten unter dem Namen dieser Mod Keylogger. **Dieser Fork verlangt nie, Befehle in PowerShell
+> einzufügen oder ein „All-in-One“-Installationsprogramm auszuführen.** Die Mod besteht nur aus `winmm.dll` und INI-Dateien.
+> Lade Dateien nur von den Releases dieses Repositorys oder baue sie selbst aus dem Quellcode.
 
-# Installation
+> ⚠️ **Inoffiziell.** Weder der Autor von Extra Options noch der Entwickler von Azimuth unterstützen diesen Fork.
+> Bitte meldet Fehler, die mit diesem Fork auftreten, **nicht** bei ihnen. Azimuth-Fehler nur ohne Mods melden.
 
-The installation is different depending on the translation layer you're using.
+## Was hier NICHT enthalten ist
+- Keine Spieldateien von Forza Horizon 2 (keine EXE, keine Datenbank, keine Grafiken/XAML).
+- Kein Azimuth. Den gibt es nur beim Entwickler: <https://almost-there-games.itch.io/azimuth>
+- Die Skripte in `tools/` erzeugen ihre Dateien **auf deinem PC aus deinen eigenen Spieldateien**.
 
-Azimuth:
+## Installation (Azimuth)
+1. Azimuth installieren und das Spiel einmal normal starten.
+2. Aus dem Release `winmm.dll` und `FH2_ExtraOptions.ini` in den Azimuth-Ordner kopieren (neben `azimuth.exe`).
+   Vorher die alte `winmm.dll` sichern.
+3. Lenkrad: In G HUB 900° lassen. Einstellungen stehen in `FH2_Lenkrad.ini` (wird beim ersten Start angelegt)
+   und im Spiel unter Optionen › HUD › ganz unten.
 
- - Extract all the 3 files from the "Azimuth" folder in this ZIP to Azimuth's main folder where "Azimuth.exe" is located.
+Neue INI-Schlüssel dieses Forks in `FH2_ExtraOptions.ini`, Abschnitt `[Traffic]`:
+`TrafficLevel` (0–5), `RushHourAllDay` (0/1), `Wetter` (0 Original, 1 Sonnig, 2 Bewölkt, 3 Gewitterwolken, 4 Regen, 5 Nebel).
 
-Mezcal:
+## Selbst bauen
+Wie im Original (siehe [BUILD.md](BUILD.md)): `python build.py /pfad/zu/zig --azimuth`.
+Tests (Emulator, brauchen `unicorn` und `pefile` sowie lokal entpackte Spieldateien in `FH2_GAME`):
+```
+python build.py /pfad/zu/zig --azimuth --test --output tests/winmm_test.dll
+cd tests && python test_menu.py winmm_test.dll && python test_buttons.py winmm_test.dll && python test_weather.py winmm_test.dll
+```
 
- - Extract all the 3 files from the "Mezcal" folder in this ZIP to "Forza Horizon 2\Mount" which is where "forza_durango_release_final.exe" is located.
+## Lizenz
+GPL-3.0 wie das Original (siehe [LICENSE](LICENSE)). Änderungen gegenüber dem Original sind in
+[CHANGES_FORK.md](CHANGES_FORK.md) aufgelistet.
 
-Note: Add this command if you're running Linux and using Wine: `WINEDLLOVERRIDES="winmm.dll=n,b" %command%`
-More information on Linux support here: https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions/pull/35#issuecomment-6233015259
+## KI-Hinweis
+Wie beim Original: Der Code dieses Forks wurde mit Hilfe einer KI (Claude von Anthropic) geschrieben und
+im Emulator sowie im Spiel getestet.
 
-# Information
+---
 
-Most of the features can now be toggled and tweaked inside the game itself through the native menus.
-
-### Treasure Map
-The treasure map is disabled by default. Open the INI and set "UnlockTreasureMap" to 1 if you wish to have it.
-
-### Autodrive
-Autodrive is engaged by pressing D-Pad Down on a controller or F2 on a keyboard.
-
-### Drift Camera
-The drift camera can be toggled and tweaked in the HUD settings inside the game.
-Cockpit drift camera is enabled by default.
-
-### Vehicle Lights
-Lights can be toggled by clicking the right-stick.
-
-Hazards can be toggled by tapping D-Pad Up.
-
-Turn signals can be engaged by holding D-Pad Left/Right for 1 second; They will de-engage once a turn is made and the steering is centered.
-
-Note: Some cars have glitched turn signals. More info here: [Turn Signals Wiki Page](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions/wiki/Turn-Signals)
-
-### Roofs
-Roofs can be toggled by pressing and holding the right-stick for 3 seconds while stationary. More info here: [Roof Toggle Wiki Page](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions/wiki/Roofs)
-
-# Custom gamerpic 
-You can edit the "Gamerpic.png" image located where you extracted the mod files to with any image you like and it will be used as your avatar in-game.
-The maximum dimensions supported are 2048x2048 and the image must weight less than 16 megabytes.
-
-# AI Usage Disclosure
-Codex was used in this project to create the DLL. The actual research was done manually, mostly based on things I already toyed with in the other titles from the series, but I don't yet have the C language knowledge to code something like this fully from scratch (I was initially editing the raw executable). Leaving this here as I believe people have the right to know.
+### English summary
+Unofficial fork of Forza Horizon 2 Extra Options 0.2.98 (Azimuth). Adds a Logitech G920 wheel bridge with
+DirectInput force feedback and profiles, free wheel buttons, an in-game "Wheel & Traffic" page (HUD options),
+higher traffic limits with presets and fixed weather via the game's own weather control. No game files or Azimuth binaries are included. GPL-3.0.
+Not supported by the original authors – please don't report fork issues to them.

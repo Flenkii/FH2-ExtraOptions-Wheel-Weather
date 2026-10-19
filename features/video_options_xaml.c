@@ -1,4 +1,5 @@
 #include "video_options_xaml.h"
+#include "rig_settings.h"
 #include "support.h"
 #include "video_options_text.h"
 #include "video_settings.h"
@@ -240,6 +241,121 @@ static void append_fov_rows(XamlBuffer *buffer) {
     }
 }
 
+/* ------------------------------------------------------------------ Lenkrad & Verkehr */
+
+/* Same template as EO_FovSlider (label left, number right, bar between), with the number
+   format and the range as parameters. */
+static void append_number_slider_style(XamlBuffer *buffer, const char *key, const char *converter,
+                                       const char *minimum, const char *maximum,
+                                       const char *step) {
+    append_text(buffer, "<Style x:Key=\"");
+    append_text(buffer, key);
+    append_text(buffer, "\" TargetType=\"Slider\" BasedOn=\"{StaticResource A_Style_Slider_Options}\">"
+                        "<Setter Property=\"Minimum\" Value=\"");
+    append_text(buffer, minimum);
+    append_text(buffer, "\"/><Setter Property=\"Maximum\" Value=\"");
+    append_text(buffer, maximum);
+    append_text(buffer, "\"/><Setter Property=\"SmallChange\" Value=\"");
+    append_text(buffer, step);
+    append_text(buffer,
+                "\"/><Setter Property=\"Template\"><Setter.Value><ControlTemplate "
+                "TargetType=\"Slider\"><Grid FocusManager.IsFocusScope=\"True\"><Grid.ColumnDefinitions>"
+                "<ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>"
+                "<local:FZTextBlock x:Name=\"PART_Label\" Text=\"{Binding Tag.Heading, "
+                "RelativeSource={RelativeSource TemplatedParent}}\" Style=\"{StaticResource "
+                "A_Style_SliderControlText}\" HorizontalAlignment=\"Left\"/>"
+                "<DockPanel Grid.Column=\"1\"><local:FZTextBlock DockPanel.Dock=\"Right\" "
+                "Width=\"64\" TextAlignment=\"Right\" HorizontalAlignment=\"Right\" "
+                "Text=\"{Binding Value, RelativeSource={RelativeSource TemplatedParent}, "
+                "Converter={StaticResource ");
+    append_text(buffer, converter);
+    append_text(buffer,
+                "}}\" Style=\"{StaticResource A_Style_SliderControlText}\"/>"
+                "<Grid Margin=\"32, 0, 8, 0\" Height=\"22\"><local:FZMaterial "
+                "x:Name=\"PART_SliderMaterial\" Color=\"{StaticResource A_Color_MediumGreyText}\"/>"
+                "<Track x:Name=\"PART_Track\"><Track.DecreaseRepeatButton><RepeatButton "
+                "x:Name=\"Left\" Style=\"{StaticResource A_Style_RepeatButton_Left_Unfocused}\"/>"
+                "</Track.DecreaseRepeatButton></Track></Grid></DockPanel></Grid>"
+                "<ControlTemplate.Triggers><DataTrigger Binding=\"{Binding RelativeSource="
+                "{RelativeSource Mode=FindAncestor, AncestorType=ListBoxItem}, "
+                "Path=IsKeyboardFocusWithin}\" Value=\"True\"><Setter "
+                "TargetName=\"PART_SliderMaterial\" Property=\"Color\" Value=\"{StaticResource "
+                "A_Color_Header_Background}\"/><Setter TargetName=\"Left\" Property=\"Style\" "
+                "Value=\"{StaticResource A_Style_RepeatButton_Left_Focused}\"/></DataTrigger>"
+                "</ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>");
+}
+
+/* Percent sliders keep the game's own template (value shown as "70%"). */
+static void append_percent_slider_style(XamlBuffer *buffer, const char *key, const char *maximum,
+                                        const char *step) {
+    append_text(buffer, "<Style x:Key=\"");
+    append_text(buffer, key);
+    append_text(buffer, "\" TargetType=\"Slider\" BasedOn=\"{StaticResource A_Style_Slider_Options}\">"
+                        "<Setter Property=\"Maximum\" Value=\"");
+    append_text(buffer, maximum);
+    append_text(buffer, "\"/><Setter Property=\"SmallChange\" Value=\"");
+    append_text(buffer, step);
+    append_text(buffer, "\"/></Style>");
+}
+
+static void append_rig_resources(XamlBuffer *buffer, unsigned char *image) {
+    append_text(buffer, "<local:NumUnitConverter x:Key=\"EO_RigNumber0\" FractionDigits=\"0\" "
+                        "ShowUnit=\"False\"/><local:NumUnitConverter x:Key=\"EO_RigNumber1\" "
+                        "FractionDigits=\"1\" ShowUnit=\"False\"/>");
+    append_number_slider_style(buffer, "EO_RigMilliseconds", "EO_RigNumber0", "0", "200", "5");
+    append_number_slider_style(buffer, "EO_RigLock", "EO_RigNumber0", "30", "450", "10");
+    append_number_slider_style(buffer, "EO_RigRotation", "EO_RigNumber0", "180", "2520", "30");
+    append_number_slider_style(buffer, "EO_RigCurve", "EO_RigNumber1", "1", "6", "0.1");
+    append_percent_slider_style(buffer, "EO_RigPercent200", "2", "0.05");
+    append_percent_slider_style(buffer, "EO_RigPercent100", "1", "0.05");
+    append_percent_slider_style(buffer, "EO_RigPercent50", "0.5", "0.01");
+    for (unsigned position = 0; position < RIG_SETTING_COUNT; ++position) {
+        unsigned id = rig_setting_order(position);
+        const RigSettingInfo *info = rig_setting_info(id);
+        append_text(buffer, "<local:TileMenuDataItem x:Key=\"EO_");
+        append_text(buffer, info->property);
+        append_text(buffer, "\" Heading=\"");
+        append_attribute(buffer, rig_setting_heading(image, id));
+        append_text(buffer, "\" Description=\"");
+        append_attribute(buffer, rig_setting_description(image, id));
+        append_text(buffer, "\"/>");
+    }
+}
+
+static void append_rig_rows(XamlBuffer *buffer, unsigned char *image) {
+    for (unsigned position = 0; position < RIG_SETTING_COUNT; ++position) {
+        unsigned id = rig_setting_order(position);
+        const RigSettingInfo *info = rig_setting_info(id);
+        if (info->kind == RIG_KIND_TOGGLE || info->kind == RIG_KIND_TRAFFIC ||
+            info->kind == RIG_KIND_PROFILE || info->kind == RIG_KIND_FUNCTION ||
+            info->kind == RIG_KIND_DENSITY || info->kind == RIG_KIND_WEATHER) {
+            append_text(buffer, "<local:SpinnerControl Tag=\"{StaticResource EO_");
+            append_text(buffer, info->property);
+            append_text(buffer, "}\" Style=\"{StaticResource A_Style_SpinnerControl_Default}\" "
+                                "Label=\"");
+            append_attribute(buffer, rig_setting_heading(image, id));
+            append_text(buffer, "\" SelectedIndex=\"{Binding ");
+            append_text(buffer, info->property);
+            append_text(buffer, "}\" ItemsSource=\"{Binding ");
+            append_text(buffer, info->kind == RIG_KIND_TRAFFIC    ? "TrafficChoices"
+                                : info->kind == RIG_KIND_PROFILE  ? "ProfileChoices"
+                                : info->kind == RIG_KIND_DENSITY  ? "DensityChoices"
+                                : info->kind == RIG_KIND_WEATHER  ? "WeatherChoices"
+                                : info->kind == RIG_KIND_FUNCTION ? "FunctionChoices"
+                                                                  : "ToggleChoices");
+            append_text(buffer, "}\"/>");
+        } else {
+            append_text(buffer, "<Slider Value=\"{Binding ");
+            append_text(buffer, info->property);
+            append_text(buffer, "}\" Tag=\"{StaticResource EO_");
+            append_text(buffer, info->property);
+            append_text(buffer, "}\" Style=\"{StaticResource ");
+            append_text(buffer, info->style);
+            append_text(buffer, "}\"/>");
+        }
+    }
+}
+
 static size_t extend_hud_xaml(unsigned char *image, const char *text, size_t length, char *output,
                               size_t capacity) {
     const char *resources = text_find(text, length, "</ResourceDictionary>");
@@ -264,11 +380,13 @@ static size_t extend_hud_xaml(unsigned char *image, const char *text, size_t len
             append_resources(&buffer, localized);
             append_fov_resources(&buffer, localized);
             append_settings_resources(&buffer, localized, 4, 9);
+            append_rig_resources(&buffer, image);
         }
         if (text + index == end) {
             append_drift_rows(&buffer, localized);
             append_fov_rows(&buffer);
             append_settings_rows(&buffer, localized, 4, 9);
+            append_rig_rows(&buffer, image);
         }
         if (text + index == width) {
             append_text(&buffer, "Width=\"1000\"");

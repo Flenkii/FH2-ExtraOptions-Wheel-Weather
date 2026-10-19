@@ -19,4 +19,5 @@ typedef struct {
 } VideoOptionsText;
 
 const VideoOptionsText *video_options_text(unsigned char *game_image);
+int video_options_text_is_german(unsigned char *game_image);
 #endif

@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "features.h"
+#include "features/rig_settings.h"
 #include "features/video_settings.h"
 #include "logging.h"
 #include "patch_engine.h"
@@ -76,8 +77,18 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
     if (initialized && options.enabled) {
         log_set_directory(settings_directory);
         azimuth_apply_save_compatibility(options.disable_azimuth_save_checksums);
+        azimuth_apply_loading_guard(game_image);
     }
 #endif
+    if (initialized && options.enabled) {
+        log_set_directory(settings_directory);
+        traffic_tunables_start(game_image, &options);
+        weather_start(game_image, &options);
+    }
+    if (initialized && options.enabled) {
+        wheel_bridge_start(game_image, executable_path, settings_directory);
+        rig_settings_start(settings_directory);
+    }
     if (initialized && options.enabled) {
         log_enabled_features(settings_directory, &options);
     }

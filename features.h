@@ -53,6 +53,10 @@ void drift_camera_commit_options(const ModOptions *options);
 void media_overrides_prepare_hook(unsigned char *game_image);
 void autodrive_prepare_hooks(unsigned char *game_image, const ModOptions *options);
 void gamerpic_set_directory(const wchar_t *directory);
+void traffic_tunables_start(unsigned char *game_image, const ModOptions *options);
+void weather_start(unsigned char *game_image, const ModOptions *options);
+void wheel_bridge_start(unsigned char *game_image, const wchar_t *executable_path,
+                        const wchar_t *settings_directory);
 
 void livery_prepare_defaults(unsigned char *game_image);
 const unsigned char *livery_patch_target(const PatchDefinition *patch, const ModOptions *options);

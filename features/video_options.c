@@ -1,5 +1,7 @@
 #include "features.h"
 #include "logging.h"
+#include "rig_settings.h"
+#include "wheel_buttons.h"
 #include "support.h"
 #include "video_options_text.h"
 #include "video_options_xaml.h"
@@ -84,8 +86,17 @@ enum {
     CHOICES_LIVERY_RESOLUTION,
     CHOICES_LIVERY_MSAA,
     CHOICES_LIVERY_SAMPLING,
+    CHOICES_TRAFFIC,
+    CHOICES_PROFILE,
+    CHOICES_FUNCTION,
+    CHOICES_DENSITY,
+    CHOICES_WEATHER,
     CHOICE_COLLECTION_COUNT
 };
+
+/* properties: video/HUD settings, choice collections, then "Lenkrad & Verkehr" */
+#define RIG_PROPERTY_BASE (VIDEO_SETTING_COUNT + CHOICE_COLLECTION_COUNT)
+#define PROPERTY_COUNT (RIG_PROPERTY_BASE + RIG_SETTING_COUNT)
 
 static unsigned char *image;
 static Allocate allocate;
@@ -95,10 +106,13 @@ static ResetOptions native_reset, native_hud_reset;
 static ObjectInitialize object_initialize, object_cleanup;
 static BoxValue box_int, box_float;
 static PropertyChanged property_changed;
-static NativeProperty properties[VIDEO_SETTING_COUNT + CHOICE_COLLECTION_COUNT];
-static NativePropertyLink links[2][VIDEO_SETTING_COUNT + CHOICE_COLLECTION_COUNT];
+static NativeProperty properties[PROPERTY_COUNT];
+static NativePropertyLink links[2][PROPERTY_COUNT];
 static void *choices[CHOICE_COLLECTION_COUNT];
-static const unsigned choice_counts[] = {3, 2, 6, 2, 3, 2, 3, 2, 2, 2};
+static const unsigned choice_counts[] = {3, 2, 6, 2, 3, 2, 3, 2, 2, 2, 6, RIG_PROFILE_COUNT,
+                                        WHEEL_FUNCTION_COUNT, RIG_DENSITY_COUNT,
+                                        RIG_WEATHER_COUNT};
+_Static_assert(ARRAY_COUNT(choice_counts) == CHOICE_COLLECTION_COUNT, "choice counts");
 static void *registered_image[2], *initialized_image;
 static void *resource_vtable[7];
 static unsigned char resource_thunk[12], reset_original[8], reset_callback[8],
@@ -142,7 +156,27 @@ static const char *const property_names[] = {"DriftMode",
                                              "ShadowChoices",
                                              "LiveryResolutionChoices",
                                              "LiveryMsaaChoices",
-                                             "LiverySamplingChoices"};
+                                             "LiverySamplingChoices",
+                                             "TrafficChoices",
+                                             "ProfileChoices",
+                                             "FunctionChoices",
+                                             "DensityChoices",
+                                             "WeatherChoices"};
+_Static_assert(ARRAY_COUNT(property_names) == RIG_PROPERTY_BASE, "property names");
+
+static const char *property_name(unsigned index) {
+    if (index < RIG_PROPERTY_BASE) {
+        return property_names[index];
+    }
+    const RigSettingInfo *info = rig_setting_info(index - RIG_PROPERTY_BASE);
+    return info ? info->property : NULL;
+}
+
+static int rig_is_index(unsigned kind) {
+    return kind == RIG_KIND_TOGGLE || kind == RIG_KIND_TRAFFIC || kind == RIG_KIND_PROFILE ||
+           kind == RIG_KIND_FUNCTION || kind == RIG_KIND_DENSITY ||
+           kind == RIG_KIND_WEATHER;
+}
 
 static void release_object(void *object) {
     if (object && InterlockedDecrement((volatile LONG *)((unsigned char *)object + 0x10)) == 0) {
@@ -164,7 +198,17 @@ static void **get_value(void **output, NativeProperty *property, void *page) {
     (void)page;
     unsigned index = property_index(property);
     *output = NULL;
-    if (index >= VIDEO_SETTING_COUNT && index < ARRAY_COUNT(properties)) {
+    if (index >= RIG_PROPERTY_BASE && index < ARRAY_COUNT(properties)) {
+        unsigned id = index - RIG_PROPERTY_BASE;
+        const RigSettingInfo *info = rig_setting_info(id);
+        int value = rig_setting_get(id);
+        if (rig_is_index(info->kind)) {
+            box_int(output, &value);
+        } else {
+            float number = (float)value * info->scale;
+            box_float(output, &number);
+        }
+    } else if (index >= VIDEO_SETTING_COUNT && index < RIG_PROPERTY_BASE) {
         *output = choices[index - VIDEO_SETTING_COUNT];
         if (*output) {
             InterlockedIncrement((volatile LONG *)((unsigned char *)*output + 0x10));
@@ -181,8 +225,43 @@ static void **get_value(void **output, NativeProperty *property, void *page) {
     return output;
 }
 
+static void set_rig_value(NativeProperty *property, void *page, void *boxed, unsigned id) {
+    const RigSettingInfo *info = rig_setting_info(id);
+    int value;
+    if (rig_is_index(info->kind)) {
+        if (!memory_read((unsigned char *)boxed + 0x28, &value, sizeof(value))) {
+            return;
+        }
+    } else {
+        float number;
+        if (!memory_read((unsigned char *)boxed + 0x28, &number, sizeof(number)) ||
+            !float_is_finite(number)) {
+            return;
+        }
+        float units = number / info->scale;
+        if (!(units >= (float)info->minimum - 0.5f && units <= (float)info->maximum + 0.5f)) {
+            return;
+        }
+        value = (int)(units + 0.5f);
+    }
+    if (rig_setting_set(id, value)) {
+        property_changed(page, property);
+        /* a profile changes several sliders, and every FFB slider can change the profile */
+        for (unsigned other = 0; other < RIG_SETTING_COUNT; ++other) {
+            NativeProperty *p = &properties[RIG_PROPERTY_BASE + other];
+            if (p != property && p->name) {
+                property_changed(page, p);
+            }
+        }
+    }
+}
+
 static void set_value(NativeProperty *property, void *page, void *boxed) {
     unsigned index = property_index(property);
+    if (boxed && index >= RIG_PROPERTY_BASE && index < ARRAY_COUNT(properties)) {
+        set_rig_value(property, page, boxed, index - RIG_PROPERTY_BASE);
+        return;
+    }
     if (!boxed || index >= VIDEO_SETTING_COUNT) {
         return;
     }
@@ -238,6 +317,16 @@ static const wchar_t *choice_text(unsigned collection, unsigned index) {
             return index ? text->spawn_choices[index - 1] : text->default_choice;
         case CHOICES_CAR_POSITION:
             return text->car_position_choices[index];
+        case CHOICES_TRAFFIC:
+            return rig_traffic_choice(image, index);
+        case CHOICES_PROFILE:
+            return rig_profile_choice(image, index);
+        case CHOICES_FUNCTION:
+            return rig_function_choice(image, index);
+        case CHOICES_DENSITY:
+            return rig_density_choice(image, index);
+        case CHOICES_WEATHER:
+            return rig_weather_choice(image, index);
     }
     return NULL;
 }
@@ -286,22 +375,28 @@ static int register_properties(unsigned page) {
         }
     }
     for (unsigned index = 0; index < ARRAY_COUNT(properties); ++index) {
-        if (!property_names[index]) {
+        const char *name = property_name(index);
+        if (!name) {
             continue;
         }
-        unsigned factory = index >= VIDEO_SETTING_COUNT ? NATIVE_COLLECTION_PROPERTY
-                           : index == DRIFT_MODE || index >= CAMERA_SETTING_COUNT
-                               ? NATIVE_INT_PROPERTY
-                               : NATIVE_FLOAT_PROPERTY;
+        int rig = index >= RIG_PROPERTY_BASE;
+        unsigned factory =
+            rig ? (rig_is_index(rig_setting_info(index - RIG_PROPERTY_BASE)->kind)
+                       ? NATIVE_INT_PROPERTY
+                       : NATIVE_FLOAT_PROPERTY)
+            : index >= VIDEO_SETTING_COUNT ? NATIVE_COLLECTION_PROPERTY
+            : index == DRIFT_MODE || index >= CAMERA_SETTING_COUNT ? NATIVE_INT_PROPERTY
+                                                                   : NATIVE_FLOAT_PROPERTY;
         NativeProperty *property = &properties[index];
         if (initialized_image != image) {
             NativeProperty *original = ((PropertyFactory)(image + factory))();
             object_initialize(property);
             property->vtable = original->vtable;
             memory_copy((unsigned char *)property + 0x28, (unsigned char *)original + 0x28, 0x30);
-            property->name = property_names[index];
+            property->name = name;
             property->getter = (void *)get_value;
-            property->setter = index >= VIDEO_SETTING_COUNT ? NULL : (void *)set_value;
+            property->setter =
+                index >= VIDEO_SETTING_COUNT && !rig ? NULL : (void *)set_value;
         }
         links[page][index].property = property;
         ((void (*)(void *, NativePropertyLink *))(image + NATIVE_REGISTER_PROPERTY))(
@@ -310,8 +405,8 @@ static int register_properties(unsigned page) {
     }
     initialized_image = image;
     registered_image[page] = image;
-    log_append(page == HUD_PAGE ? "HUD: drift, FOV and extra controls added to the native HUD "
-                                  "menu.\r\n"
+    log_append(page == HUD_PAGE ? "HUD: drift, FOV, extra controls and Lenkrad & Verkehr added "
+                                  "to the native HUD menu.\r\n"
                                 : "VIDEO: graphics controls added to the native Video menu.\r\n");
     return 1;
 }
@@ -447,10 +542,28 @@ __declspec(dllexport) size_t Fh2TestVideoXaml(const char *text, size_t length, c
 }
 
 __declspec(dllexport) void *Fh2TestVideoProperty(unsigned index) {
-    return index < ARRAY_COUNT(properties) && property_names[index] ? &properties[index] : NULL;
+    return index < ARRAY_COUNT(properties) && property_name(index) ? &properties[index] : NULL;
 }
 
 __declspec(dllexport) const wchar_t *Fh2TestVideoChoiceText(unsigned index) {
     return index < 3 ? choice_text(0, index) : NULL;
+}
+
+__declspec(dllexport) void Fh2TestVideoPrepare(unsigned char *game_image) {
+    video_options_prepare_hooks(game_image);
+}
+
+__declspec(dllexport) void *Fh2TestVideoGet(unsigned index, void **output) {
+    return index < ARRAY_COUNT(properties) ? get_value(output, &properties[index], NULL) : NULL;
+}
+
+__declspec(dllexport) void Fh2TestVideoSet(unsigned index, void *page, void *boxed) {
+    if (index < ARRAY_COUNT(properties)) {
+        set_value(&properties[index], page, boxed);
+    }
+}
+
+__declspec(dllexport) unsigned Fh2TestRigPropertyBase(void) {
+    return RIG_PROPERTY_BASE;
 }
 #endif

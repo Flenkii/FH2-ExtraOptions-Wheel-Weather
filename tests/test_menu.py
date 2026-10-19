@@ -1,0 +1,312 @@
+"""End-to-end test of the in-game page 'Lenkrad & Verkehr' with the real compiled test DLL."""
+import os, shutil, struct, sys, tempfile, xml.dom.minidom
+from emu import Emu, GAME
+
+DLL = sys.argv[1] if len(sys.argv) > 1 else 'winmm_test.dll'
+GAME_DIR = os.environ.get('FH2_GAME', 'game')  # entpackte Spieldateien (nicht im Repo)
+USER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixture')  # fester Teststand (Mein Setup)
+HUD = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_HUDOptions.xaml')
+VIDEO = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_VideoOptions.xaml')
+fails = []
+
+def check(cond, text):
+    print(('  ok   ' if cond else '  FAIL ') + text)
+    if not cond:
+        fails.append(text)
+
+root = tempfile.mkdtemp(prefix='eo-menu-')
+for name in ('FH2_Lenkrad.ini', 'FH2_ExtraOptions.ini'):
+    shutil.copy(os.path.join(USER, name), os.path.join(root, name))
+os.makedirs(os.path.join(root, 'game'))
+original_wheel = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read()
+original_eo = open(os.path.join(root, 'FH2_ExtraOptions.ini'), 'rb').read()
+
+e = Emu(DLL, root)
+
+# ---- fake game image: language, tunables, native UI helpers
+def set_language(code):
+    manager = e.alloc(0x80)
+    raw = code.encode() + b'\0' * (16 - len(code))
+    e.mu.mem_write(manager + 0x30, raw)
+    e.wq(manager + 0x30 + 16, len(code))
+    e.wq(manager + 0x30 + 24, 15)
+    e.wq(GAME + 0x3662990, manager)
+
+VT_FLOAT, VT_INT = 0x2c5cb58, 0x2c81898
+TUNABLES = [(0x36e8f18, VT_FLOAT, 14.0, [14, 24, 36, 48, 64, 100]),
+            (0x36e6e88, VT_FLOAT, 16.0, [16, 24, 36, 48, 64, 100]),
+            (0x36e8d10, VT_FLOAT, 10.0, [10, 14, 20, 26, 32, 50]),
+            (0x36e6dd0, VT_FLOAT, 7.0, [7, 10, 14, 18, 24, 40]),
+            (0x34c80f8, VT_FLOAT, 8.0, [8, 7, 6, 5, 4, 3]),
+            (0x34c8578, VT_INT, 5, [5, 8, 12, 16, 20, 30])]
+TIMES = [(0x36e6d80, 7.0, 0.5), (0x36e6e60, 19.0, 23.5), (0x36e8ea0, 23.0, 23.5), (0x36e6df8, 5.0, 0.5)]
+for rva, vt, orig, _ in TUNABLES:
+    e.wq(GAME + rva, GAME + vt)
+    for off in (0x10, 0x14, 0x18, 0x20):
+        (e.wd if vt == VT_INT else e.wf)(GAME + rva + off, int(orig) if vt == VT_INT else orig)
+for rva, orig, _ in TIMES:
+    e.wq(GAME + rva, GAME + VT_FLOAT)
+    for off in (0x10, 0x14, 0x18, 0x20):
+        e.wf(GAME + rva + off, orig)
+
+def tunable(rva, vt=VT_FLOAT):
+    return e.rd(GAME + rva + 0x10) if vt == VT_INT else e.rf(GAME + rva + 0x10)
+
+changed = []
+def box(kind):
+    def f():
+        out, value_ptr = e.arg(0), e.arg(1)
+        b = e.alloc(0x30)
+        e.mu.mem_write(b + 0x28, bytes(e.mu.mem_read(value_ptr, 4)))
+        e.wq(b, 0x1111 if kind == 'int' else 0x2222)
+        e.wq(out, b)
+        return out
+    return f
+e.stub('box_int', box('int'), GAME + 0x4702d0)
+e.stub('box_float', box('float'), GAME + 0x3f5990)
+e.stub('property_changed', lambda: changed.append(e.arg(1)), GAME + 0xcf9c60)
+
+set_language('DE')
+e.call('Fh2TestVideoPrepare', GAME)
+exe = e.put_wstr('C:\\test\\game\\forza_durango_release_final.exe')
+directory = e.put_wstr('C:\\test')
+print('Start')
+r = e.call('Fh2TestRigStart', GAME, exe, directory)
+check(r == 1, f'Extra-Options-INI gelesen und Speicher-Thread gestartet (Ergebnis {r})')
+check(len(e.threads) == 3, f'3 Threads angelegt (Verkehr, Lenkrad-Hook, Speichern): {len(e.threads)}')
+
+# ---- XAML
+print('XAML (HUD-Seite, echte Spieldatei)')
+def extend(path):
+    text = open(path, 'rb').read()
+    src = e.put_bytes(text)
+    cap = 131072
+    out = e.alloc(cap)
+    n = e.call('Fh2TestVideoXaml', src, len(text), out, cap)
+    return text, bytes(e.mu.mem_read(out, n)) if n else b''
+
+hud_in, hud = extend(HUD)
+check(len(hud) > len(hud_in), f'HUD-XAML erweitert: {len(hud_in)} -> {len(hud)} Bytes (Limit 131072)')
+try:
+    dom = xml.dom.minidom.parseString(hud)
+    check(True, 'HUD-XAML ist wohlgeformtes XML')
+except Exception as ex:
+    dom = None
+    check(False, f'HUD-XAML wohlgeformt: {ex}')
+open(os.path.join(tempfile.gettempdir(), 'hud_de.xaml'), 'wb').write(hud)
+props = ['EoRigWheelEnabled', 'EoRigForceFeedback', 'EoRigProfile', 'EoRigStrength', 'EoRigRumble', 'EoRigDamping',
+         'EoRigFriction', 'EoRigSmoothing', 'EoRigMinimumForce', 'EoRigOutward', 'EoRigCentering',
+         'EoRigLock', 'EoRigCurve', 'EoRigRotation', 'EoRigShifter', 'EoRigButton1', 'EoRigButton2', 'EoRigButton3',
+         'EoRigDensity', 'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather']
+if dom:
+    lst = [n for n in dom.getElementsByTagName('local:CommonListBox') if n.getAttribute('x:Name') == 'OptionsList'][0]
+    rows = [n for n in lst.childNodes if n.nodeType == n.ELEMENT_NODE]
+    bindings = [(r.getAttribute('SelectedIndex') or r.getAttribute('Value')) for r in rows]
+    rig = [b for b in bindings if 'EoRig' in b]
+    check(rig == ['{Binding %s}' % p for p in props], f'{len(rig)} neue Zeilen in richtiger Reihenfolge am Ende der Liste')
+    check(bindings[-len(props):] == rig, 'neue Zeilen stehen ganz unten (nach Drift/FOV/EO)')
+    keys = {n.getAttribute('x:Key') for n in dom.getElementsByTagName('*') if n.getAttribute('x:Key')}
+    used = set()
+    for n in dom.getElementsByTagName('*'):
+        for a in ('Tag', 'Style', 'BasedOn'):
+            v = n.getAttribute(a)
+            if v.startswith('{StaticResource EO_'):
+                used.add(v[len('{StaticResource '):-1])
+        for c in n.childNodes:
+            pass
+    import re
+    for conv in re.findall(rb'Converter=\{StaticResource (EO_[A-Za-z0-9]+)\}', hud):
+        used.add(conv.decode())
+    check(used <= keys, f'alle EO-Ressourcen definiert ({len(used)} benutzt): fehlend {sorted(used - keys)}')
+    headings = [n.getAttribute('Heading') for n in dom.getElementsByTagName('local:TileMenuDataItem')
+                if n.getAttribute('x:Key').startswith('EO_EoRig')]
+    check(headings[2] == 'Lenkrad: FFB-Profil' and headings[3] == 'Lenkrad: FFB-Stärke' and headings[18] == 'Verkehr: Voreinstellung' and headings[19] == 'Verkehr: Menge' and headings[15] == 'Lenkrad: Taste RSB', f'deutsche Texte: {headings[2]!r}, {headings[3]!r}, {headings[15]!r}, {headings[18]!r}')
+    prof = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding EoRigProfile}'][0]
+    check(prof.getAttribute('ItemsSource') == '{Binding ProfileChoices}', 'Profil-Zeile nutzt ProfileChoices')
+    check(hud.startswith(b'\xef\xbb\xbf'), 'UTF-8-BOM vorhanden (Spiel braucht ihn für Umlaute)')
+    # every original row still there
+    orig_dom = xml.dom.minidom.parseString(hud_in)
+    orig_rows = [n for n in [x for x in orig_dom.getElementsByTagName('local:CommonListBox')][0].childNodes if n.nodeType == n.ELEMENT_NODE]
+    check(len(rows) == len(orig_rows) + 7 + 5 + 5 + 22, f'Zeilen: {len(orig_rows)} Original + 17 EO + 22 neu = {len(rows)}')
+    btn = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding EoRigButton1}'][0]
+    check(btn.getAttribute('ItemsSource') == '{Binding FunctionChoices}', 'Tasten-Zeilen nutzen FunctionChoices')
+
+# old build output must be a prefix-compatible subset: removing the new parts gives the old XAML
+video_in, video = extend(VIDEO)
+check(b'EoRig' not in video and len(video) > len(video_in), 'Video-Seite unverändert (keine neuen Zeilen dort)')
+
+# ---- properties
+print('Menü-Eigenschaften (Getter/Setter)')
+base = e.call('Fh2TestRigPropertyBase')
+out = e.alloc(8)
+def get(i):
+    e.wq(out, 0)
+    e.call('Fh2TestVideoGet', base + i, out)
+    b = e.rq(out)
+    kind = e.rq(b)
+    return e.rd(b + 0x28) if kind == 0x1111 else round(e.rf(b + 0x28), 4)
+
+def set_box(i, value, as_float):
+    b = e.alloc(0x30)
+    if as_float:
+        e.wf(b + 0x28, value)
+    else:
+        e.wd(b + 0x28, value)
+    changed.clear()
+    e.call('Fh2TestVideoSet', base + i, 0x7777, b)
+    return len(changed) >= 1
+
+expect = [1, 1, 0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2, 450.0, 3.0, 180.0, 0, 2, 1, 0, 5, 0]
+got = [get(i) for i in range(19)]
+check(got == expect, f'Startwerte aus deinen INIs: {got}')
+check(get(20) == 1, f'Profil beim Start: Mein Setup erkannt ({get(20)})')
+
+ok = set_box(2, 0.85, True); check(ok and get(2) == 0.85, 'FFB-Stärke 75% -> 85%')
+check(get(20) == 0, 'Profil springt auf Eigene Werte, sobald ein Wert geändert wird')
+ok = set_box(2, 0.85, True); check(not ok, 'gleicher Wert -> keine Änderung gemeldet')
+ok = set_box(3, 1.5, True); check(ok and get(3) == 1.5, 'Vibration -> 150%')
+ok = set_box(11, 2.9999998, True); check(not ok or get(11) == 3.0, 'Kurve 2.9999998 wird zu 3.0 gerundet (keine Änderung)')
+ok = set_box(11, 3.1, True); check(ok and get(11) == 3.1, 'Kurve 3.0 -> 3.1')
+ok = set_box(10, 440.0, True); check(ok and get(10) == 440.0, 'Anschlag 450 -> 440')
+ok = set_box(12, 210.0, True); check(ok and get(12) == 210.0, 'Drehwinkel 180 -> 210')
+ok = set_box(6, 40.0, True); check(ok and get(6) == 40.0, 'Glättung 35 -> 40 ms')
+ok = set_box(13, 1, False); check(ok and get(13) == 1, 'H-Schaltung aus -> an')
+ok = set_box(17, 3, False); check(ok and get(17) == 3, 'Verkehr 5 -> 3')
+ok = set_box(18, 1, False); check(ok and get(18) == 1, 'Rushhour aus -> an')
+ok = set_box(17, 6, False); check(not ok and get(17) == 3, 'Verkehr 6 (ungültig) abgelehnt')
+ok = set_box(2, 2.5, True); check(not ok and get(2) == 0.85, 'FFB-Stärke 250% (außerhalb) abgelehnt')
+ok = set_box(2, float('nan'), True); check(not ok and get(2) == 0.85, 'NaN abgelehnt')
+ok = set_box(10, 20.0, True); check(not ok and get(10) == 440.0, 'Anschlag 20 (unter 30) abgelehnt')
+
+# ---- live into the wheel bridge
+print('Lenkrad live')
+e.call('Fh2TestWheelLiveApply')
+cfg = {i: e.call('Fh2TestWheelConfig', i) & 0xffffffff for i in range(17)}
+check(cfg[2] == 85 and cfg[3] == 150 and cfg[11] == 31 and cfg[10] == 440 and cfg[12] == 210 and cfg[6] == 40 and cfg[13] == 1,
+      f'Brücke übernimmt Werte: Stärke {cfg[2]}, Vibration {cfg[3]}, Kurve {cfg[11]}, Anschlag {cfg[10]}, Drehwinkel {cfg[12]}, Glättung {cfg[6]}, Schaltknauf {cfg[13]}')
+c_mid = e.call('Fh2TestWheelCurve', 32768 + 3277) & 0xffffffff
+ok = set_box(11, 1.0, True)
+e.call('Fh2TestWheelLiveApply')
+c_lin = e.call('Fh2TestWheelCurve', 32768 + 3277) & 0xffffffff
+check(c_lin == 32768 + 3277 and c_mid > c_lin + 2000, f'Lenkkurve wird neu berechnet: 10% Einschlag -> Kurve 3.1: {c_mid - 32768}, linear: {c_lin - 32768}')
+set_box(11, 3.1, True)
+e.call('Fh2TestWheelLiveApply')
+
+# ---- traffic live
+print('Verkehr live')
+r = e.call('Fh2TestTrafficApply')
+vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
+check(vals == [48.0, 48.0, 26.0, 18.0, 5.0, 16], f'Stufe 3 im Spielspeicher: {vals}')
+times = [tunable(rva) for rva, _, _ in TIMES]
+check(times == [0.5, 23.5, 23.5, 0.5], f'Rushhour ganztägig: {times}')
+set_box(18, 0, False); e.call('Fh2TestTrafficApply')
+times = [tunable(rva) for rva, _, _ in TIMES]
+check(times == [7.0, 19.0, 23.0, 5.0], f'Rushhour aus -> Originalzeiten zurück: {times}')
+set_box(17, 0, False); e.call('Fh2TestTrafficApply')
+vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
+check(vals == [14.0, 16.0, 10.0, 7.0, 8.0, 5], f'Stufe 0 -> Originalwerte zurück: {vals}')
+set_box(17, 5, False); e.call('Fh2TestTrafficApply')
+vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
+check(vals == [100.0, 100.0, 50.0, 40.0, 3.0, 30], f'Stufe 5 wieder: {vals}')
+set_box(17, 3, False)
+
+# ---- saving
+print('Speichern')
+e.tick += 100
+e.call('Fh2TestRigStep', e.tick)
+check(open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read() == original_wheel, 'nicht sofort gespeichert (wartet 0,6 s nach der letzten Änderung)')
+e.tick += 700
+e.call('Fh2TestRigStep', e.tick)
+wheel = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read()
+eo = open(os.path.join(root, 'FH2_ExtraOptions.ini'), 'rb').read()
+import difflib
+def diff(a, b):
+    return [l for l in difflib.unified_diff(a.decode('latin1').splitlines(), b.decode('latin1').splitlines(), lineterm='', n=0) if l[:1] in '+-' and l[:3] not in ('+++', '---')]
+dw, de = diff(original_wheel, wheel), diff(original_eo, eo)
+print('   FH2_Lenkrad.ini:', dw)
+print('   FH2_ExtraOptions.ini:', de)
+check(sorted(dw) == sorted(['-Drehwinkel=180', '+Drehwinkel=210', '-Schaltknauf=0', '+Schaltknauf=1', '-Anschlag=450', '+Anschlag=440',
+                           '-FFBStaerke=75', '+FFBStaerke=85', '-Vibration=50', '+Vibration=150', '-Glaettung=35', '+Glaettung=40',
+                           '-Kurve=30', '+Kurve=31']), 'Lenkrad-INI: nur die geänderten Zeilen')
+check(sorted(de) == sorted(['-TrafficLevel=5', '+TrafficLevel=3']), 'Extra-Options-INI: nur TrafficLevel (Rushhour wieder 0 = unverändert)')
+check(len(eo) <= 8192, f'Extra-Options-INI bleibt unter 8192 Bytes ({len(eo)})')
+check(not any(n.endswith('.eotmp') for n in os.listdir(root)), 'keine Temp-Dateien übrig')
+
+# EO must still accept its INI
+from shutil import copy
+r = e.call('Fh2TestReadOptions', directory, e.alloc(400))
+check(r == 1, 'Extra Options akzeptiert die geänderte INI (Parser von EO selbst)')
+
+# ---- launcher changes the INI while the game runs
+print('Launcher ändert INI während das Spiel läuft')
+p = os.path.join(root, 'FH2_Lenkrad.ini')
+text = open(p, 'rb').read().replace(b'Schaltknauf=1', b'Schaltknauf=0').replace(b'FFBStaerke=85', b'FFBStaerke=60')
+open(p, 'wb').write(text); e.touch(p)
+pe = os.path.join(root, 'FH2_ExtraOptions.ini')
+eo_text = open(pe, 'rb').read().replace(b'RushHourAllDay=0', b'RushHourAllDay=1')
+open(pe, 'wb').write(eo_text); e.touch(pe)
+e.tick += 1500
+e.call('Fh2TestRigStep', e.tick)
+check(get(13) == 0 and get(2) == 0.6 and get(18) == 1, f'neue Werte übernommen: H-Schaltung {get(13)}, Stärke {get(2)}, Rushhour {get(18)}')
+check(open(p, 'rb').read() == text, 'dabei nichts zurückgeschrieben')
+
+# ---- profiles
+print('FFB-Profile')
+ok = set_box(20, 3, False)
+vals = [get(i) for i in (2, 3, 4, 5, 6, 7, 8, 9)]
+check(ok and vals == [0.9, 0.4, 0.04, 0.03, 20.0, 0.03, 0.4, 0.2] and get(20) == 3, f'Profil Direkt setzt alle 8 Werte: {vals}')
+ok = set_box(20, 0, False); check(not ok and get(2) == 0.9, 'Eigene Werte wählen ändert nichts')
+ok = set_box(20, 1, False)
+check(ok and [get(i) for i in (2, 3, 4, 5, 6, 7, 8, 9)] == [0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2] and get(20) == 1, 'Mein Setup stellt deine Werte wieder her')
+ok = set_box(20, 6, False); check(not ok, 'Profil 6 (gibt es nicht) abgelehnt')
+e.tick += 700
+e.call('Fh2TestRigStep', e.tick)
+w2 = open(p, 'rb').read()
+check(b'\n=' not in w2 and b'Profil' not in w2, 'Profil selbst wird nicht in die INI geschrieben')
+check(b'FFBStaerke=75' in w2 and b'Glaettung=35' in w2, 'Profilwerte gespeichert')
+
+# ---- Verkehrs-Voreinstellung
+print('Verkehrs-Voreinstellung')
+ok = set_box(21, 5, False)
+check(ok and get(17) == 5 and get(18) == 1 and get(21) == 5, f'Chaos: Menge 5 + Rushhour an: {get(17)}, {get(18)}, {get(21)}')
+ok = set_box(21, 2, False)
+check(ok and get(17) == 1 and get(18) == 0 and get(21) == 2, f'Ruhig: Menge 1, Rushhour aus: {get(17)}, {get(18)}, {get(21)}')
+ok = set_box(21, 0, False); check(not ok and get(17) == 1, 'Eigene Werte wählen ändert nichts')
+ok = set_box(17, 2, False)
+check(ok and get(21) == 0, 'Menge von Hand geändert: Voreinstellung zeigt Eigene Werte')
+ok = set_box(21, 6, False); check(not ok, 'Voreinstellung 6 (gibt es nicht) abgelehnt')
+ok = set_box(21, 1, False)
+check(ok and get(17) == 0 and get(18) == 0 and get(21) == 1, 'Original: Menge 0, Rushhour aus')
+e.tick += 700
+e.call('Fh2TestRigStep', e.tick)
+pe_now = open(pe, 'rb').read()
+check(b'Voreinstellung' not in pe_now and b'EoRigDensity' not in pe_now, 'Voreinstellung selbst wird nicht in die INI geschrieben')
+check(b'TrafficLevel=0' in pe_now, 'Menge aus der Voreinstellung gespeichert')
+
+# ---- Wetter
+print('Wetter')
+check(get(19) == 0, f'Wetter beim Start: Original ({get(19)})')
+ok = set_box(19, 4, False)
+check(ok and get(19) == 4, f'Wetter Regen gewählt: {get(19)}')
+ok = set_box(19, 6, False); check(not ok and get(19) == 4, 'Wetter 6 (gibt es nicht) abgelehnt')
+e.tick += 700
+e.call('Fh2TestRigStep', e.tick)
+pe_now = open(pe, 'rb').read()
+check(b'Wetter=4' in pe_now, 'Wetter in FH2_ExtraOptions.ini gespeichert ([Traffic] Wetter=4)')
+r = e.call('Fh2TestReadOptions', directory, e.alloc(400))
+check(r == 1, 'Extra Options akzeptiert die INI mit Wetter-Zeile')
+ok = set_box(19, 0, False)
+e.tick += 700
+e.call('Fh2TestRigStep', e.tick)
+check(ok and b'Wetter=0' in open(pe, 'rb').read(), 'Wetter zurück auf Original gespeichert')
+check(e.call('Fh2TestWeatherManager') == 0, 'ohne Spielwelt: kein WeatherManager, nichts passiert')
+
+# ---- English
+print('Englisch')
+set_language('EN')
+_, hud_en = extend(HUD)
+check(b'Wheel: Force Feedback Strength' in hud_en and b'Traffic: Amount' in hud_en, 'englische Texte bei englischem Spiel')
+xml.dom.minidom.parseString(hud_en)
+print()
+print('FEHLER:' if fails else 'ALLE TESTS OK', len(fails) or '')
+sys.exit(1 if fails else 0)
