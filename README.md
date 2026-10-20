@@ -9,7 +9,7 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 | **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, H-shifter, buttons. |
 | **Force feedback** | Own FFB through DirectInput (forces from the car's handling, rumble, damping, friction, centering …) with 5 profiles. |
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
-| **In-game "Wheel & Traffic" page** | Options › HUD › bottom. All values apply instantly and are saved. |
+| **In-game "Wheel & Traffic" page** | Options › HUD › bottom. Wheel values apply instantly and are saved. Traffic values are saved instantly but only take effect after restarting the game (see Known Issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
 | **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog – through the game's own weather control, no game files changed. |
 | **Tools** (`tools/`) | Python scripts for the cockpit wheel, More Traffic files and "traffic variety" (20 extra traffic car models). |
@@ -40,6 +40,12 @@ Updates will follow when possible.
 - **[Almost There Games](https://almost-there-games.itch.io/azimuth)** – Azimuth wrapper (not included)
 - **[Flenkii](https://github.com/Flenkii)** – idea, testing, maintainer of this fork
 - **Claude (Anthropic)** – wrote most of the new code in this fork together with Flenkii
+
+## Known issues
+- **Traffic settings need an Azimuth restart.** `Traffic: Preset` and `Traffic: Amount` in the in-game menu are
+  written to the INI immediately, but the game only reads traffic density when it loads the world. Change the
+  values, then fully close and restart Azimuth (not just go back to a menu) for the new traffic amount to show
+  up on the road. Wheel and weather settings are not affected – those apply immediately without a restart.
 
 ## Not included
 - No Forza Horizon 2 game files (no EXE, no database, no graphics/XAML).
