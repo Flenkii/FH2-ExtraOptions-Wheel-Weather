@@ -11,7 +11,7 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
 | **In-game "Wheel & Traffic" page** | Options › HUD › bottom. All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
-| **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog (fog only on Storm Island, cloudy elsewhere) – through the game's own weather control, no game files changed. |
+| **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog (fog only on Storm Island, sunny elsewhere) – through the game's own weather control, no game files changed. |
 | **Tools** (`tools/`) | Python scripts for the cockpit wheel, More Traffic files and "traffic variety" (20 extra traffic car models). |
 
 > 🚨 **Security:** See the original author's warning in [README_ORIGINAL.md](README_ORIGINAL.md): scammers spread
@@ -47,6 +47,8 @@ Updates will follow when possible.
   values, then fully close and restart Azimuth (not just go back to a menu) for the new traffic amount to show
   up on the road. Wheel and weather settings are not affected. Note: the in-game description of the traffic
   options still says "Applies immediately" – that text is wrong and will be fixed in the next release.
+- **Fog only on Storm Island.** Outside Storm Island the "Fog" weather setting shows sunny weather. The in-game
+  description says "cloudy elsewhere" – that text is wrong and will be fixed in the next release.
 
 ## Not included
 - No Forza Horizon 2 game files (no EXE, no database, no graphics/XAML).
