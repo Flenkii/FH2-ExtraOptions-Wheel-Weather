@@ -1,8 +1,8 @@
-FH2 Extra Options (inoffizieller Fork) – Tastenbelegung / Keyboard bindings
-==========================================================================
-Standard-Belegung. Ändern: FH2_Tastatur.ini im Azimuth-Ordner (mehrere Tasten mit Komma,
-z. B. Gas=W,Hoch; die Tastennamen stehen oben in der Datei).
-Default bindings. Change them in FH2_Tastatur.ini next to azimuth.exe.
+FH2 Extra Options (unofficial fork) – Keyboard bindings / Tastenbelegung
+========================================================================
+Default bindings. Change them in FH2_Tastatur.ini next to azimuth.exe (several keys with a
+comma, e.g. Gas=W,Up; the key names are listed at the top of the file).
+Standard-Belegung. Ändern: FH2_Tastatur.ini im Azimuth-Ordner (mehrere Tasten mit Komma).
 
 FAHREN / DRIVING
   W                  Gas                          Throttle

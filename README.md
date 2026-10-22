@@ -52,7 +52,7 @@ Updates will follow when possible.
 | X / Y | Buttons X / Y | Minus / Plus | Radio previous / next |
 | Page Up / Page Down | Tabs left / right (LB / RB) | | |
 
-The same list is in `Tastenbelegung.txt` in the release ZIP.
+The same list is in `Keybindings.txt` in the release ZIP.
 
 Driving functions follow the controller layout chosen in the game. Several keys per function are possible
 (comma-separated); key names are listed at the top of `FH2_Tastatur.ini`.
@@ -93,9 +93,9 @@ Optional parts of the ZIP:
 
 | Folder | What it is |
 |---|---|
-| `Optional/Profile/Controller` | controller only (wheel and keyboard off) |
-| `Optional/Profile/Tastatur` | keyboard (+ controller), wheel off |
-| `Optional/Profile/Lenkrad` | wheel with the game's force feedback (= default) |
+| `Optional/Profiles/Controller` | controller only (wheel and keyboard off) |
+| `Optional/Profiles/Keyboard` | keyboard (+ controller), wheel off |
+| `Optional/Profiles/Wheel` | wheel with the game's force feedback (= default) |
 
 A profile is a pair `FH2_Lenkrad.ini` + `FH2_Tastatur.ini`; copy both next to `azimuth.exe` (replaces yours).
 

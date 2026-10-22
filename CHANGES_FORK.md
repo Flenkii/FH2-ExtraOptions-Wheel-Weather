@@ -13,7 +13,7 @@ Fork of https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions – modified in 
 - `features/ini_edit.c/.h` – edit INI lines without losing comments
 - `adapters/azimuth_guard.c` – guard against a null pointer while loading under Azimuth
 - `tools/` – Python scripts for the cockpit wheel, More Traffic and traffic variety, `make_release.py`
-- `release/` – `FH2_ExtraOptions.ini`, `LIESMICH.txt` and `Tastenbelegung.txt` for the release ZIP
+- `release/` – `FH2_ExtraOptions.ini`, `README.txt` and `Keybindings.txt` for the release ZIP
 - `tests/` – emulator tests (unicorn)
 
 ## Changed files

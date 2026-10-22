@@ -4,9 +4,9 @@
     python3 tools/make_release.py <winmm.dll> <output.zip>
 
 Layout:
-    LIESMICH.txt, Tastenbelegung.txt, LICENSE.txt
+    README.txt, Keybindings.txt, LICENSE.txt
     Azimuth/winmm.dll, Azimuth/FH2_ExtraOptions.ini          (required)
-    Optional/Profile/<name>/FH2_Lenkrad.ini, FH2_Tastatur.ini  (ready-made settings)
+    Optional/Profiles/<name>/FH2_Lenkrad.ini, FH2_Tastatur.ini  (ready-made settings)
 
 The profile INIs are the mod's own default files (taken from the C sources, so they always match
 the DLL) with a few values changed. No game files are packed."""
@@ -49,8 +49,8 @@ def changed(text, section, values):
 
 PROFILES = {
     'Controller': ({'Aktiv': 0}, {'Aktiv': 0}),
-    'Tastatur': ({'Aktiv': 0}, {'Aktiv': 1}),
-    'Lenkrad': ({'Aktiv': 1}, {'Aktiv': 1}),
+    'Keyboard': ({'Aktiv': 0}, {'Aktiv': 1}),
+    'Wheel': ({'Aktiv': 1}, {'Aktiv': 1}),
 }
 
 
@@ -65,14 +65,14 @@ def main():
             info.external_attr = 0o644 << 16
             z.writestr(info, data)
 
-        for name in ('LIESMICH.txt', 'Tastenbelegung.txt'):
+        for name in ('README.txt', 'Keybindings.txt'):
             add(name, (ROOT / 'release' / name).read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
         add('LICENSE.txt', (ROOT / 'LICENSE').read_bytes())
         add('Azimuth/winmm.dll', dll.read_bytes())
         add('Azimuth/FH2_ExtraOptions.ini', (ROOT / 'release/FH2_ExtraOptions.ini').read_bytes())
         for name, (wheel_values, keyboard_values) in PROFILES.items():
-            add(f'Optional/Profile/{name}/FH2_Lenkrad.ini', changed(wheel, 'Lenkrad', wheel_values).encode('ascii'))
-            add(f'Optional/Profile/{name}/FH2_Tastatur.ini',
+            add(f'Optional/Profiles/{name}/FH2_Lenkrad.ini', changed(wheel, 'Lenkrad', wheel_values).encode('ascii'))
+            add(f'Optional/Profiles/{name}/FH2_Tastatur.ini',
                 changed(keyboard, 'Tastatur', keyboard_values).encode('ascii'))
     with zipfile.ZipFile(output) as z:
         for info in z.infolist():
