@@ -1,4 +1,4 @@
-# Forza Horizon 2 – Extra Options + Wheel, Traffic & Weather (unofficial fork)
+# Forza Horizon 2 – Extra Options + Wheel, Keyboard, Traffic & Weather (unofficial fork)
 
 This is an **unofficial fork** of [RokkuDayo/ForzaHorizon2_ExtraOptions](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions)
 (version 0.2.98) for the Xbox One version of Forza Horizon 2 running on the **Azimuth** wrapper.
@@ -6,13 +6,14 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 
 | Feature | In short |
 |---|---|
-| **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, H-shifter, buttons. |
-| **Force feedback** | Own FFB through DirectInput (forces from the car's handling, rumble, damping, friction, centering …) with 5 profiles. |
+| **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, paddles, buttons. |
+| **Force feedback** | The **game's own wheel force feedback** – FH2's original Xbox wheel programs run on the PC, exactly like on the Xbox. No custom FFB profiles; only strength and rumble can be scaled. |
+| **Keyboard** | Drive with WASD, arrow keys move the camera while driving and scroll in menus, Enter/Backspace/Esc in menus, FH5-like bindings. Works together with a controller (one merged pad, no "player 2" problems). Bindings in `FH2_Tastatur.ini`. While a wheel is connected, the game drives with the wheel. |
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
 | **In-game "Wheel & Traffic" page** | Options › HUD › bottom. All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
 | **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog (fog only on Storm Island, sunny elsewhere) – through the game's own weather control, no game files changed. |
-| **Tools** (`tools/`) | Python scripts for the cockpit wheel, More Traffic files and "traffic variety" (20 extra traffic car models). |
+| **Tools** (`tools/`) | Python scripts for the cockpit wheel, More Traffic files and "traffic variety" (20 extra traffic car models). Not part of the release download. |
 
 > 🚨 **Security:** See the original author's warning in [README_ORIGINAL.md](README_ORIGINAL.md): scammers spread
 > keyloggers using this mod's name. **This fork never asks you to paste commands into PowerShell or to run an
@@ -35,6 +36,27 @@ Tested only with this combination – other versions may not work:
 A new Azimuth release may break this mod. If Extra Options detects a mismatch it disables itself.
 Updates will follow when possible.
 
+## Keyboard bindings (default, editable in `FH2_Tastatur.ini`)
+
+| Key | Function | Key | Function |
+|---|---|---|---|
+| W | Throttle | Arrow keys | Camera while driving, scroll in menus |
+| S | Brake / reverse | Tab | Change camera |
+| A / D | Steer | C / Num2 | Look back |
+| Space | Handbrake | Num4 / Num6 | Look left / right |
+| E / Q | Shift up / down | R | Rewind |
+| Left Shift | Clutch | T | Telemetry |
+| Enter | Confirm (A) | P | Photo mode |
+| Backspace | Back (B) | L | Headlights |
+| Esc | Pause / menu | M | Map |
+| X / Y | Buttons X / Y | Minus / Plus | Radio previous / next |
+| Page Up / Page Down | Tabs left / right (LB / RB) | | |
+
+The same list is in `Tastenbelegung.txt` in the release ZIP.
+
+Driving functions follow the controller layout chosen in the game. Several keys per function are possible
+(comma-separated); key names are listed at the top of `FH2_Tastatur.ini`.
+
 ## Credits
 - **[RokkuDayo](https://github.com/RokkuDayo)** – [Extra Options](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions), the base of this fork
 - **[Almost There Games](https://almost-there-games.itch.io/azimuth)** – Azimuth wrapper (not included)
@@ -45,10 +67,14 @@ Updates will follow when possible.
 - **Traffic settings need an Azimuth restart.** `Traffic: Preset` and `Traffic: Amount` in the in-game menu are
   written to the INI immediately, but the game only reads traffic density when it loads the world. Change the
   values, then fully close and restart Azimuth (not just go back to a menu) for the new traffic amount to show
-  up on the road. Wheel and weather settings are not affected. Note: the in-game description of the traffic
-  options still says "Applies immediately" – that text is wrong and will be fixed in the next release.
-- **Fog only on Storm Island.** Outside Storm Island the "Fog" weather setting shows sunny weather. The in-game
-  description says "cloudy elsewhere" – that text is wrong and will be fixed in the next release.
+  up on the road. Wheel and weather settings are not affected.
+- **Fog only on Storm Island.** Outside Storm Island the "Fog" weather setting shows sunny weather.
+- **The keyboard needs Azimuth's gamepad input.** It is passed to the game as a gamepad; turning it on or
+  off needs a restart.
+- **With a wheel connected the game drives with the wheel.** To drive with keyboard or controller while the wheel
+  is plugged in, set `Wheel: Use Wheel In Game` to Off and restart the game.
+- **No H-pattern shifter.** FH2 only knows shift up / shift down, it ignores the gear of a shifter. Use the paddles
+  (or E/Q on the keyboard).
 
 ## Not included
 - No Forza Horizon 2 game files (no EXE, no database, no graphics/XAML).
@@ -57,14 +83,27 @@ Updates will follow when possible.
 
 ## Installation (Azimuth)
 1. Install Azimuth and start the game once normally.
-2. From the [release](../../releases), copy `winmm.dll` and `FH2_ExtraOptions.ini` into the Azimuth folder (next to `azimuth.exe`).
-   Back up your old `winmm.dll` first.
-3. Wheel: keep 900° in G HUB. Settings are in `FH2_Lenkrad.ini` (created on first start)
-   and in-game under Options › HUD › bottom.
+2. From the [release](../../releases) ZIP, copy the files from the `Azimuth` folder (`winmm.dll`, `FH2_ExtraOptions.ini`)
+   into the Azimuth folder (next to `azimuth.exe`). Back up your old `winmm.dll` first.
+3. Done – controller, keyboard and a wheel are detected automatically. Settings are in-game under
+   Options › HUD › bottom, or in `FH2_Lenkrad.ini` / `FH2_Tastatur.ini` (created on first start).
+   Wheel: keep 900° in G HUB.
+
+Optional parts of the ZIP:
+
+| Folder | What it is |
+|---|---|
+| `Optional/Profile/Controller` | controller only (wheel and keyboard off) |
+| `Optional/Profile/Tastatur` | keyboard (+ controller), wheel off |
+| `Optional/Profile/Lenkrad` | wheel with the game's force feedback (= default) |
+
+A profile is a pair `FH2_Lenkrad.ini` + `FH2_Tastatur.ini`; copy both next to `azimuth.exe` (replaces yours).
 
 New INI keys of this fork in `FH2_ExtraOptions.ini`, section `[Traffic]`:
 `TrafficLevel` (0–5), `RushHourAllDay` (0/1), `Wetter` (weather: 0 original, 1 sunny, 2 cloudy, 3 storm clouds, 4 rain, 5 fog).
-The wheel INI (`FH2_Lenkrad.ini`) uses German key names.
+The wheel INI (`FH2_Lenkrad.ini`) and the keyboard INI (`FH2_Tastatur.ini`) use German key names.
+The old tuning keys of the fork1 FFB (`Daempfung`, `Reibung` …) are only used as a fallback if the game's wheel
+programs are not available.
 
 ## Building
 Same as the original (see [BUILD.md](BUILD.md)): `python build.py /path/to/zig --azimuth`.
@@ -72,7 +111,9 @@ Tests (emulator, need `unicorn` and `pefile` plus locally extracted game files i
 ```
 python build.py /path/to/zig --azimuth --test --output tests/winmm_test.dll
 cd tests && python test_menu.py winmm_test.dll && python test_buttons.py winmm_test.dll && python test_weather.py winmm_test.dll
+python test_keyboard.py winmm_test.dll && python test_game_ffb.py winmm_test.dll && python test_ffb_vm.py <exe image>
 ```
+Release ZIP: `python tools/make_release.py winmm.dll out.zip`.
 
 ## License
 GPL-3.0 like the original (see [LICENSE](LICENSE)). Changes compared to the original are listed in

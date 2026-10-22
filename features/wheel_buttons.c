@@ -208,8 +208,60 @@ static void adapt_wheel_map(void *map, uint64_t id) {
     log_table(id);
 }
 
+/* controller (gamepad) layouts: remember which input triggers which action, for the keyboard */
+#define KIND_CONTROLLER 1
+static volatile LONG controller_input[ACTION_COUNT];
+static volatile LONG controller_ready;
+
+static void controller_defaults(void) {
+    /* ControllerLayouts layout 0 of gamedb (the game's default) */
+    static const signed char layout0[ACTION_COUNT] = {
+        [0] = 11,  [1] = 10,  [2] = -1,  [3] = 12,  [4] = 13,  [5] = 14,  [6] = 8,   [7] = -1,
+        [8] = -1,  [9] = 0x1a, [10] = 0x1b, [11] = 0x1c, [12] = 0x1d, [13] = -1, [14] = 1, [15] = 0,
+        [16] = -1, [17] = 9,  [18] = -1, [19] = -1, [20] = 15, [21] = -1, [22] = -1, [23] = 2,
+        [24] = 3,  [25] = -1, [26] = -1, [27] = -1, [28] = -1, [29] = -1, [30] = -1, [31] = -1};
+    for (unsigned a = 0; a < ACTION_COUNT; ++a) controller_input[a] = layout0[a];
+}
+
+int controller_action_input(unsigned action) {
+    if (!InterlockedCompareExchange(&controller_ready, 1, 0)) controller_defaults();
+    return action < ACTION_COUNT ? (int)controller_input[action] : -1;
+}
+
+static void record_controller_map(void *map, uint64_t id) {
+    unsigned char *contexts = *(unsigned char **)map;
+    unsigned char *contexts_end = *(unsigned char **)((unsigned char *)map + 8);
+    if (!contexts || contexts_end - contexts < 24) return;
+    Binding *first = *(Binding **)contexts, *last = *(Binding **)(contexts + 8);
+    if (!first || last < first || last - first > 256) return;
+    LONG table[ACTION_COUNT];
+    for (unsigned a = 0; a < ACTION_COUNT; ++a) table[a] = -1;
+    for (Binding *b = first; b < last; ++b) {
+        if (b->context != 0 || b->action < 0 || b->action >= ACTION_COUNT || b->input < 0 || b->input > 0x40)
+            return; /* unexpected: keep the previous table */
+        if (table[b->action] < 0) table[b->action] = b->input;
+    }
+    InterlockedExchange(&controller_ready, 1);
+    for (unsigned a = 0; a < ACTION_COUNT; ++a) InterlockedExchange(&controller_input[a], table[a]);
+    char line[64] = "KEYBOARD: game loads controller layout ";
+    size_t length = text_length(line);
+    if (id >= 10) line[length++] = (char)('0' + (id % 100) / 10);
+    line[length++] = (char)('0' + id % 10);
+    line[length++] = '\r';
+    line[length++] = '\n';
+    line[length] = 0;
+    log_append(line);
+}
+
 static uint64_t layout_hook(void *map, uint64_t id, uint64_t kind, void *options, uint64_t extra) {
     uint64_t result = load_layout(map, id, kind, options, extra);
+    if ((kind & 0xff) == KIND_CONTROLLER && map) {
+        __try {
+            record_controller_map(map, id & 0xffffffff);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            log_append("KEYBOARD: unexpected controller layout - keyboard keeps the default layout.\r\n");
+        }
+    }
     if ((kind & 0xff) == KIND_WHEEL && map) {
         __try {
             adapt_wheel_map(map, id & 0xffffffff);
@@ -335,6 +387,7 @@ static int write_code(unsigned char *site, const unsigned char *bytes, size_t si
 static const unsigned load_calls[4] = {0x2f8f1f, 0x2f8f3b, 0x2f8f57, 0x2fd673};
 
 int wheel_buttons_install(unsigned char *game_image) {
+    if (installed) return installed;
     /* until the game loads the player's layout: WheelLayouts layout 0 (gamedb) */
     for (unsigned a = 0; a < ACTION_COUNT; ++a) action_input[a] = -1;
     action_input[ACTION_SWITCH_CAMERA] = 15;
@@ -411,6 +464,9 @@ int wheel_buttons_install(unsigned char *game_image) {
 }
 
 #ifdef FH2_TWEAKS_TEST
+__declspec(dllexport) int Fh2TestControllerActionInput(unsigned action) {
+    return controller_action_input(action);
+}
 __declspec(dllexport) int Fh2TestWheelActionInput(unsigned action) {
     return action < ACTION_COUNT ? (int)action_input[action] : -2;
 }

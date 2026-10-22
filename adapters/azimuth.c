@@ -5,6 +5,7 @@
 #include "settings.h"
 #include "sha256.h"
 #include "support.h"
+#include "features/keyboard_pad.h"
 
 #define LOAD_LIBRARY_IAT 0x2853c0u
 #define TLS_LOADER_RETURN 0xcbb0cu
@@ -292,6 +293,19 @@ void azimuth_proxy_start(void *caller) {
 void adapter_process_attach(HINSTANCE instance) {
     mod_instance = instance;
     DisableThreadLibraryCalls(instance);
+    /* Keyboard & mouse: Azimuth sets up its gamepads when it creates its window, which can be
+       before the first winmm call - so its Windows.Gaming.Input import is taken over right here
+       (only a pointer swap, nothing is loaded). */
+    DWORD length = GetModuleFileNameW(NULL, filename, PATH_CAPACITY);
+    if (length && length < PATH_CAPACITY) {
+        const wchar_t *name = filename;
+        for (const wchar_t *p = filename; *p; ++p) {
+            if (*p == L'\\' || *p == L'/') name = p + 1;
+        }
+        if (!lstrcmpiW(name, L"azimuth.exe") && directory_from_module(instance, mod_directory)) {
+            keyboard_pad_arm((unsigned char *)GetModuleHandleW(NULL), mod_directory);
+        }
+    }
 }
 
 #ifdef FH2_TWEAKS_TEST

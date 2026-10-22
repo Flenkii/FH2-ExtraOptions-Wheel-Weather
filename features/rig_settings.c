@@ -14,9 +14,11 @@
 #include "support.h"
 #include "video_options_text.h"
 #include "wheel_buttons.h"
+#include "keyboard_pad.h"
 
 #define WHEEL_SECTION "Lenkrad"
 #define TRAFFIC_SECTION "Traffic"
+#define KEYBOARD_SECTION "Tastatur"
 #define EO_INI_LIMIT 8192u
 #define FILE_LIMIT 16384u
 #define SAVE_DELAY_MS 600u
@@ -61,19 +63,53 @@ static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
                             NULL},
     [RIG_WEATHER] = {"EoRigWeather", "Wetter", 0, RIG_WEATHER_COUNT - 1, RIG_KIND_WEATHER, 0, 1,
                      NULL},
+    [RIG_WHEEL_FFB_MODE] = {"EoRigFfbMode", "FFBModus", 0, RIG_FFB_MODE_COUNT - 1, RIG_KIND_FFB_MODE,
+                            0, 1, NULL},
+    [RIG_KEY_ENABLED] = {"EoKeyEnabled", "Aktiv", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
+    [RIG_KEY_STEER] = {"EoKeySteer", "Lenkzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
+    [RIG_KEY_RETURN] = {"EoKeyReturn", "Rueckstellzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1,
+                        "EO_KeyTime"},
+    [RIG_KEY_PEDAL] = {"EoKeyPedal", "Pedalzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
 };
 
-static const unsigned char order[RIG_SETTING_COUNT] = {
-    RIG_WHEEL_ENABLED,   RIG_WHEEL_FFB,       RIG_WHEEL_PROFILE,  RIG_WHEEL_STRENGTH,
-    RIG_WHEEL_RUMBLE,    RIG_WHEEL_DAMPING,   RIG_WHEEL_FRICTION, RIG_WHEEL_SMOOTHING,
-    RIG_WHEEL_MINFORCE,  RIG_WHEEL_OUTWARD,   RIG_WHEEL_CENTERING, RIG_WHEEL_LOCK,
-    RIG_WHEEL_CURVE,     RIG_WHEEL_ROTATION,  RIG_WHEEL_SHIFTER,  RIG_WHEEL_BUTTON1,
-    RIG_WHEEL_BUTTON2,   RIG_WHEEL_BUTTON3,   RIG_TRAFFIC_PRESET, RIG_TRAFFIC_LEVEL,
-    RIG_TRAFFIC_ALL_DAY, RIG_WEATHER,
+/* Rows of the menu. The force feedback is the game's own (its wheel programs), so the old
+   tuning values of the mod's own FFB (profile, damping, friction, smoothing, minimum force,
+   outward force, centring, lock, curve, FFB type) are no longer shown; they stay readable
+   from FH2_Lenkrad.ini for the fallback when the game's programs are not available.
+   The H-pattern shifter is hidden too: the game reads the gear from the wheel but never
+   uses it (FH2 only knows shift up / shift down). */
+static const unsigned char order[] = {
+    RIG_WHEEL_ENABLED,   RIG_WHEEL_FFB,     RIG_WHEEL_STRENGTH, RIG_WHEEL_RUMBLE,
+    RIG_WHEEL_ROTATION,  RIG_WHEEL_BUTTON1, RIG_WHEEL_BUTTON2,  RIG_WHEEL_BUTTON3,
+    RIG_KEY_ENABLED,     RIG_KEY_STEER,     RIG_KEY_RETURN,     RIG_KEY_PEDAL,
+    RIG_TRAFFIC_PRESET,  RIG_TRAFFIC_LEVEL, RIG_TRAFFIC_ALL_DAY, RIG_WEATHER,
 };
+_Static_assert(sizeof(order) <= RIG_SETTING_COUNT, "menu rows");
+
+int rig_kind_is_choice(unsigned kind) {
+    return kind == RIG_KIND_TOGGLE || kind == RIG_KIND_TRAFFIC || kind == RIG_KIND_PROFILE ||
+           kind == RIG_KIND_FUNCTION || kind == RIG_KIND_DENSITY || kind == RIG_KIND_WEATHER ||
+           kind == RIG_KIND_FFB_MODE;
+}
+
+const char *rig_kind_collection(unsigned kind) {
+    switch (kind) {
+        case RIG_KIND_TRAFFIC: return "TrafficChoices";
+        case RIG_KIND_PROFILE: return "ProfileChoices";
+        case RIG_KIND_DENSITY: return "DensityChoices";
+        case RIG_KIND_WEATHER: return "WeatherChoices";
+        case RIG_KIND_FUNCTION: return "FunctionChoices";
+        case RIG_KIND_FFB_MODE: return "FfbModeChoices";
+    }
+    return "ToggleChoices";
+}
+
+unsigned rig_setting_menu_count(void) {
+    return (unsigned)sizeof(order);
+}
 
 unsigned rig_setting_order(unsigned position) {
-    return position < RIG_SETTING_COUNT ? order[position] : 0;
+    return position < sizeof(order) ? order[position] : 0;
 }
 
 /* ------------------------------------------------------------------ FFB profiles */
@@ -139,40 +175,45 @@ typedef struct {
 
 static const RigText german[RIG_SETTING_COUNT] = {
     [RIG_WHEEL_ENABLED] = {"Lenkrad: Lenkrad im Spiel",
-                           "Reicht dein Lenkrad (G920 & Co.) ans Spiel durch. Wirkt erst nach einem "
-                           "Neustart des Spiels."},
+                           "Reicht dein Lenkrad (G920 & Co.) ans Spiel durch. Ist das Lenkrad "
+                           "eingesteckt, fährt das Spiel nur damit. Aus = mit Tastatur oder "
+                           "Controller fahren, obwohl das Lenkrad eingesteckt ist. Wirkt erst nach "
+                           "einem Neustart des Spiels."},
     [RIG_WHEEL_FFB] = {"Lenkrad: Force Feedback",
-                       "Kräfte aus dem Spiel am Lenkrad: Rückstellkraft, Lenkgewicht und "
-                       "Vibration. Aus = gar keine Kraft am Lenkrad. Wirkt sofort."},
+                       "Kräfte am Lenkrad an oder aus. Aus = gar keine Kraft am Lenkrad. Wirkt "
+                       "sofort."},
     [RIG_WHEEL_STRENGTH] = {"Lenkrad: FFB-Stärke",
-                            "Stärke der Kräfte aus dem Spiel. Wirkt sofort."},
+                            "Verstärkung der originalen Spielkräfte. 100 % = genau die Kraft wie "
+                            "auf der Xbox, bis 200 % = doppelt so stark. Wirkt sofort."},
     [RIG_WHEEL_RUMBLE] = {"Lenkrad: Vibration",
-                          "Stärke der Vibrationen, z. B. auf Rüttelstreifen und im Gelände. "
-                          "Wirkt sofort."},
+                          "Stärke der Vibrationen, z. B. auf Rüttelstreifen und im Gelände. 100 % = "
+                          "wie im Spiel. Wirkt sofort."},
     [RIG_WHEEL_DAMPING] = {"Lenkrad: Dämpfung",
-                           "Grunddämpfung gegen schnelles Drehen des Lenkrads. Wirkt sofort."},
+                           "Grunddämpfung gegen schnelles Drehen des Lenkrads. Nur bei FFB-Art "
+                           "Eigenes. Wirkt sofort."},
     [RIG_WHEEL_FRICTION] = {"Lenkrad: Reibung",
-                            "Leichte Reibung wie bei einer echten Lenkung. Wirkt sofort."},
+                            "Leichte Reibung wie bei einer echten Lenkung. Nur bei FFB-Art Eigenes. "
+                            "Wirkt sofort."},
     [RIG_WHEEL_SMOOTHING] = {"Lenkrad: Glättung (ms)",
                              "Glättet die Kraftstufen des Spiels in Millisekunden. Schläge kommen "
-                             "weiter sofort durch. 0 = aus. Wirkt sofort."},
+                             "weiter sofort durch. 0 = aus. Nur bei FFB-Art Eigenes. Wirkt sofort."},
     [RIG_WHEEL_MINFORCE] = {"Lenkrad: Mindestkraft",
                             "Hebt sehr kleine Kräfte an, damit das Getriebe des Lenkrads sie nicht "
                             "verschluckt. Wirkt sofort."},
     [RIG_WHEEL_OUTWARD] = {"Lenkrad: Kraft nach außen",
-                           "Anteil der Spielkraft, der das Lenkrad von der Mitte weg zieht. Wirkt "
-                           "sofort."},
+                           "Anteil der Spielkraft, der das Lenkrad von der Mitte weg zieht. Nur bei "
+                           "FFB-Art Eigenes. Wirkt sofort."},
     [RIG_WHEEL_CENTERING] = {"Lenkrad: Zentrierung (Menüs)",
                              "Zieht das Lenkrad zur Mitte, solange du nicht fährst (Menüs, "
-                             "Ladebildschirme). Wirkt sofort."},
+                             "Ladebildschirme). Nur bei FFB-Art Eigenes, bei Spiel macht das Spiel "
+                             "die Zentrierung selbst. Wirkt sofort."},
     [RIG_WHEEL_LOCK] = {"Lenkrad: Anschlag (Grad)",
                         "Grad je Seite, ab denen das Lenkrad weich blockiert. Wirkt sofort."},
     [RIG_WHEEL_CURVE] = {"Lenkrad: Lenkkurve",
-                         "1,0 = linear. Höher = Mitte direkter, außen ruhiger. Wirkt sofort. Die "
-                         "Cockpit-Animation stellt der Launcher ein."},
+                         "1,0 = linear. Höher = Mitte direkter, außen ruhiger. Wirkt sofort."},
     [RIG_WHEEL_ROTATION] = {"Lenkrad: Drehwinkel (Grad)",
                             "Lenkwinkel, den das Spiel für dein Lenkrad annimmt. In G HUB 900 Grad "
-                            "lassen. Wirkt sofort. Die Cockpit-Animation stellt der Launcher ein."},
+                            "lassen. Wirkt sofort."},
     [RIG_WHEEL_SHIFTER] = {"Lenkrad: H-Schaltung",
                            "Schaltknauf (Driving Force Shifter) benutzen. Wirkt sofort."},
     [RIG_WHEEL_BUTTON1] = {"Lenkrad: Taste RSB",
@@ -186,63 +227,93 @@ static const RigText german[RIG_SETTING_COUNT] = {
                            "ZusatzTaste3). Achtung: Windows kann damit die Xbox Game Bar öffnen. "
                            "Wirkt sofort."},
     [RIG_TRAFFIC_LEVEL] = {"Verkehr: Menge",
-                           "Höchstzahl der Verkehrsautos. Wirkt sofort, neue Autos erscheinen nach "
-                           "und nach. Die Verkehrsdateien stellt der Launcher ein."},
+                           "Höchstzahl der Verkehrsautos. Wird sofort gespeichert, wirkt aber erst "
+                           "nach einem Neustart von Azimuth (Spiel ganz schließen und neu starten)."},
     [RIG_TRAFFIC_ALL_DAY] = {"Verkehr: Rushhour rund um die Uhr",
                              "Volle Verkehrsdichte zu jeder Uhrzeit statt nur von 7 bis 19 Uhr. "
                              "Wirkt sofort."},
     [RIG_WEATHER] = {"Wetter",
                      "Festes Wetter in der freien Fahrt: Sonnig, Bewölkt, Gewitterwolken, Regen "
-                     "oder Nebel (Nebel nur auf der Sturm-Insel, sonst bewölkt). Original = das "
+                     "oder Nebel (Nebel nur auf der Sturm-Insel, sonst sonnig). Original = das "
                      "Wetter wechselt wie im Spiel. Rennen und Treffen mit eigenem Wetter behalten "
                      "es, danach kommt deine Wahl zurück. Wirkt nach dem Schließen des Menüs."},
     [RIG_TRAFFIC_PRESET] = {"Verkehr: Voreinstellung",
                             "Stellt Menge und Rushhour mit einem Klick ein: Original, Ruhig (24), "
                             "Lebhaft (48), Rushhour (64, rund um die Uhr) oder Chaos (100, rund "
                             "um die Uhr). Änderst du danach Menge oder Rushhour, steht hier Eigene "
-                            "Werte. Wirkt sofort."},
+                            "Werte. Wird sofort gespeichert, die Menge wirkt aber erst nach einem "
+                            "Neustart von Azimuth."},
     [RIG_WHEEL_PROFILE] = {"Lenkrad: FFB-Profil",
                            "Lädt fertige Werte für Stärke, Vibration, Dämpfung, Reibung, Glättung, "
-                           "Mindestkraft, Kraft nach außen und Zentrierung. Mein Setup = deine "
-                           "Werte vom 18.10. Änderst du danach etwas, steht hier Eigene Werte. "
-                           "Wirkt sofort."},
+                           "Mindestkraft, Kraft nach außen und Zentrierung. Nur bei FFB-Art "
+                           "Eigenes. Änderst du danach etwas, steht hier Eigene Werte. Wirkt "
+                           "sofort."},
+    [RIG_WHEEL_FFB_MODE] = {"Lenkrad: FFB-Art",
+                            "Spiel = die originalen Lenkrad-Programme von FH2, genau wie auf der "
+                            "Xbox: Rückstellkraft, Lenkgewicht, Dämpfung, Vibration und die "
+                            "Zentrierung in Menüs berechnet das Spiel. Eigenes = das alte FFB der "
+                            "Mod. Wirkt sofort."},
+    [RIG_KEY_ENABLED] = {"Tastatur: Tastatur",
+                         "Die Tastatur steuert das Spiel wie ein Gamepad: W/S Gas und Bremse, A/D "
+                         "lenken, Leertaste Handbremse, E/Q schalten, Pfeiltasten = Kamera beim "
+                         "Fahren und Blättern in Menüs, Enter/Rücktaste/Esc in Menüs. Belegung "
+                         "in FH2_Tastatur.ini. Controller funktionieren weiter. Mit eingestecktem "
+                         "Lenkrad fährt das Spiel nur mit dem Lenkrad. Wirkt nach einem Neustart "
+                         "des Spiels."},
+    [RIG_KEY_STEER] = {"Tastatur: Lenkzeit (ms)",
+                       "So lange dauert es bis zum vollen Lenkeinschlag, wenn du A oder D hältst. "
+                       "Höher = sanfter. Wirkt sofort."},
+    [RIG_KEY_RETURN] = {"Tastatur: Rückstellzeit (ms)",
+                        "So lange dauert es, bis die Lenkung nach dem Loslassen wieder gerade steht. "
+                        "Wirkt sofort."},
+    [RIG_KEY_PEDAL] = {"Tastatur: Pedalzeit (ms)",
+                       "So lange dauert es bis Vollgas oder Vollbremsung mit W oder S. 0 = sofort. "
+                       "Wirkt sofort."},
 };
 
 static const RigText english[RIG_SETTING_COUNT] = {
     [RIG_WHEEL_ENABLED] = {"Wheel: Use Wheel In Game",
-                           "Passes your wheel (G920 and similar) to the game. Restart the game to "
-                           "apply."},
+                           "Passes your wheel (G920 and similar) to the game. While the wheel is "
+                           "plugged in, the game drives with the wheel only. Off = drive with "
+                           "keyboard or controller although the wheel is plugged in. Restart the "
+                           "game to apply."},
     [RIG_WHEEL_FFB] = {"Wheel: Force Feedback",
-                       "Game forces on the wheel: self-aligning torque, steering weight and "
-                       "rumble. Off = no force on the wheel at all. Applies immediately."},
+                       "Forces on the wheel on or off. Off = no force on the wheel at all. Applies "
+                       "immediately."},
     [RIG_WHEEL_STRENGTH] = {"Wheel: Force Feedback Strength",
-                            "Strength of the game forces. Applies immediately."},
-    [RIG_WHEEL_RUMBLE] = {"Wheel: Rumble", "Strength of road and kerb rumble. Applies immediately."},
+                            "Gain of the game's original forces. 100% = exactly the force of the "
+                            "Xbox, up to 200% = twice as strong. Applies immediately."},
+    [RIG_WHEEL_RUMBLE] = {"Wheel: Rumble",
+                          "Strength of road and kerb rumble. 100% = as in the game. Applies "
+                          "immediately."},
     [RIG_WHEEL_DAMPING] = {"Wheel: Damping",
-                           "Base damping against fast wheel movement. Applies immediately."},
+                           "Base damping against fast wheel movement. Type Own only. Applies "
+                           "immediately."},
     [RIG_WHEEL_FRICTION] = {"Wheel: Friction",
-                            "Light friction like a real steering rack. Applies immediately."},
+                            "Light friction like a real steering rack. Type Own only. Applies "
+                            "immediately."},
     [RIG_WHEEL_SMOOTHING] = {"Wheel: Smoothing (ms)",
                              "Smooths the game's force steps in milliseconds. Impacts still pass "
-                             "through. 0 = off. Applies immediately."},
+                             "through. 0 = off. Type Own only. Applies immediately."},
     [RIG_WHEEL_MINFORCE] = {"Wheel: Minimum Force",
                             "Lifts very small forces so the wheel's gears do not swallow them. "
                             "Applies immediately."},
     [RIG_WHEEL_OUTWARD] = {"Wheel: Outward Force",
-                           "Share of the game force that pulls the wheel away from the centre. "
-                           "Applies immediately."},
+                           "Share of the game force that pulls the wheel away from the centre. Type "
+                           "Own only. Applies immediately."},
     [RIG_WHEEL_CENTERING] = {"Wheel: Centring (Menus)",
-                             "Pulls the wheel to the centre while you are not driving. Applies "
+                             "Pulls the wheel to the centre while you are not driving. Type Own "
+                             "only; with type Game the game centres the wheel itself. Applies "
                              "immediately."},
     [RIG_WHEEL_LOCK] = {"Wheel: Lock (Degrees)",
                         "Degrees per side after which the wheel is softly blocked. Applies "
                         "immediately."},
     [RIG_WHEEL_CURVE] = {"Wheel: Steering Curve",
                          "1.0 = linear. Higher = more direct centre, calmer outside. Applies "
-                         "immediately. The launcher adjusts the cockpit animation."},
+                         "immediately."},
     [RIG_WHEEL_ROTATION] = {"Wheel: Rotation (Degrees)",
                             "Rotation the game assumes for your wheel. Keep 900 degrees in G HUB. "
-                            "Applies immediately. The launcher adjusts the cockpit animation."},
+                            "Applies immediately."},
     [RIG_WHEEL_SHIFTER] = {"Wheel: H-Pattern Shifter",
                            "Use the Driving Force Shifter. Applies immediately."},
     [RIG_WHEEL_BUTTON1] = {"Wheel: RSB Button",
@@ -256,24 +327,45 @@ static const RigText english[RIG_SETTING_COUNT] = {
                            "FH2_Lenkrad.ini). Windows may open the Xbox Game Bar with it. "
                            "Applies immediately."},
     [RIG_TRAFFIC_LEVEL] = {"Traffic: Amount",
-                           "Maximum number of traffic cars. Applies immediately; new cars appear "
-                           "over time. The launcher installs the traffic files."},
+                           "Maximum number of traffic cars. Saved immediately, but only applies after "
+                           "restarting Azimuth (close the game completely and start it again)."},
     [RIG_TRAFFIC_ALL_DAY] = {"Traffic: Rush Hour All Day",
                              "Full traffic density at any time of day instead of 7:00-19:00 only. "
                              "Applies immediately."},
     [RIG_WEATHER] = {"Weather",
                      "Fixed weather in free roam: Sunny, Cloudy, Storm Clouds, Rain or Fog (fog "
-                     "only on Storm Island, cloudy elsewhere). Original = the game's normal "
+                     "only on Storm Island, sunny elsewhere). Original = the game's normal "
                      "weather changes. Races and meets with their own weather keep it; your "
                      "choice returns afterwards. Applies after closing the menu."},
     [RIG_TRAFFIC_PRESET] = {"Traffic: Preset",
                             "Sets amount and rush hour in one go: Original, Calm (24), Busy (48), "
                             "Rush Hour (64, all day) or Chaos (100, all day). Changing amount or "
-                            "rush hour afterwards shows Custom. Applies immediately."},
+                            "rush hour afterwards shows Custom. Saved immediately, the amount only "
+                            "applies after restarting Azimuth."},
     [RIG_WHEEL_PROFILE] = {"Wheel: Force Feedback Profile",
                            "Loads ready-made values for strength, rumble, damping, friction, "
-                           "smoothing, minimum force, outward force and centring. Changing any of "
-                           "them afterwards shows Custom. Applies immediately."},
+                           "smoothing, minimum force, outward force and centring. Type Own only. "
+                           "Changing any of them afterwards shows Custom. Applies immediately."},
+    [RIG_WHEEL_FFB_MODE] = {"Wheel: Force Feedback Type",
+                            "Game = FH2's original wheel programs, exactly like on the Xbox: "
+                            "aligning torque, steering weight, damping, rumble and the centring in "
+                            "menus come from the game. Own = the mod's old force feedback. Applies "
+                            "immediately."},
+    [RIG_KEY_ENABLED] = {"Keyboard: Keyboard",
+                         "The keyboard controls the game like a gamepad: W/S throttle and brake, "
+                         "A/D steer, Space handbrake, E/Q shift, arrow keys = camera while driving "
+                         "and scrolling in menus, Enter/Backspace/Esc in menus. Bindings in "
+                         "FH2_Tastatur.ini. Controllers keep working. While a wheel is plugged "
+                         "in, the game drives with the wheel only. Restart the game to apply."},
+    [RIG_KEY_STEER] = {"Keyboard: Steering Time (ms)",
+                       "Time to full lock while you hold A or D. Higher = smoother. Applies "
+                       "immediately."},
+    [RIG_KEY_RETURN] = {"Keyboard: Return Time (ms)",
+                        "Time until the steering is straight again after letting go. Applies "
+                        "immediately."},
+    [RIG_KEY_PEDAL] = {"Keyboard: Pedal Time (ms)",
+                       "Time to full throttle or full brake with W or S. 0 = instant. Applies "
+                       "immediately."},
 };
 
 static const wchar_t *const profile_german[RIG_PROFILE_COUNT] = {
@@ -290,6 +382,16 @@ static const wchar_t *const weather_german[RIG_WEATHER_COUNT] = {
     L"Original", L"Sonnig", L"Bewölkt", L"Gewitterwolken", L"Regen", L"Nebel"};
 static const wchar_t *const weather_english[RIG_WEATHER_COUNT] = {
     L"Original", L"Sunny", L"Cloudy", L"Storm Clouds", L"Rain", L"Fog"};
+
+static const wchar_t *const ffb_mode_german[RIG_FFB_MODE_COUNT] = {L"Spiel (original)", L"Eigenes (alt)"};
+static const wchar_t *const ffb_mode_english[RIG_FFB_MODE_COUNT] = {L"Game (original)", L"Own (old)"};
+
+const wchar_t *rig_ffb_mode_choice(unsigned char *game_image, unsigned index) {
+    if (index >= RIG_FFB_MODE_COUNT) {
+        return L"";
+    }
+    return video_options_text_is_german(game_image) ? ffb_mode_german[index] : ffb_mode_english[index];
+}
 
 const wchar_t *rig_weather_choice(unsigned char *game_image, unsigned index) {
     if (index >= RIG_WEATHER_COUNT) {
@@ -347,20 +449,31 @@ const wchar_t *rig_traffic_choice(unsigned char *game_image, unsigned index) {
 /* ------------------------------------------------------------------ values */
 
 static wchar_t traffic_ini[PATH_CAPACITY];
-static volatile LONG dirty_wheel, dirty_traffic;
+static volatile LONG64 dirty_wheel, dirty_traffic, dirty_keyboard;
 static volatile ULONGLONG save_after;
 static SRWLOCK file_lock = SRWLOCK_INIT;
 static int started;
 
+static int is_keyboard(unsigned id) {
+    return id >= RIG_KEY_FIRST && id < RIG_KEY_END;
+}
+
 static int stored_value(unsigned id) {
     if (id < RIG_WHEEL_COUNT) {
         return wheel_bridge_setting(id);
+    }
+    if (is_keyboard(id)) {
+        return keyboard_setting(id - RIG_KEY_FIRST);
     }
     return id == RIG_WEATHER ? weather_setting() : traffic_setting(id);
 }
 
 static int is_wheel(unsigned id) {
     return id < RIG_WHEEL_COUNT;
+}
+
+static volatile LONG64 *dirty_mask(unsigned id) {
+    return is_wheel(id) ? &dirty_wheel : is_keyboard(id) ? &dirty_keyboard : &dirty_traffic;
 }
 
 int rig_setting_get(unsigned id) {
@@ -387,6 +500,8 @@ int rig_setting_get(unsigned id) {
 static void forward(unsigned id, int value) {
     if (is_wheel(id)) {
         wheel_bridge_set_setting(id, value);
+    } else if (is_keyboard(id)) {
+        keyboard_set_setting(id - RIG_KEY_FIRST, value);
     } else {
         if (id == RIG_WEATHER) {
             weather_set_setting(value);
@@ -425,7 +540,7 @@ int rig_setting_set(unsigned id, int value) {
     }
     forward(id, value);
     save_after = GetTickCount64() + SAVE_DELAY_MS;
-    InterlockedOr(is_wheel(id) ? &dirty_wheel : &dirty_traffic, (LONG)(1u << id));
+    InterlockedOr64(dirty_mask(id), (LONG64)(1ull << id));
     return 1;
 }
 
@@ -507,11 +622,12 @@ typedef struct {
     int error_logged;
 } RigFile;
 
-static RigFile files[2] = {
+static RigFile files[3] = {
     {NULL, WHEEL_SECTION, 0, RIG_WHEEL_COUNT, FILE_LIMIT, 1, 0, "FH2_Lenkrad.ini", 0},
     /* never create the Extra Options INI: its absence means "all defaults" */
     {traffic_ini, TRAFFIC_SECTION, RIG_TRAFFIC_LEVEL, RIG_WEATHER + 1, EO_INI_LIMIT, 0, 0,
      "FH2_ExtraOptions.ini", 0},
+    {NULL, KEYBOARD_SECTION, RIG_KEY_FIRST, RIG_KEY_END, FILE_LIMIT, 1, 0, "FH2_Tastatur.ini", 0},
 };
 
 static void log_line(const char *first, const char *second);
@@ -537,7 +653,7 @@ static void log_line(const char *first, const char *second) {
 }
 
 /* Writes the current values of the dirty settings into the file. */
-static int save_file(RigFile *f, LONG dirty) {
+static int save_file(RigFile *f, LONG64 dirty) {
     if (!f->path || !f->path[0] || !dirty) {
         return 1;
     }
@@ -553,7 +669,7 @@ static int save_file(RigFile *f, LONG dirty) {
     size_t source_length = length;
     unsigned slot = 0;
     for (unsigned id = f->first; id < f->end; ++id) {
-        if (!(dirty & (LONG)(1u << id))) {
+        if (!(dirty & (LONG64)(1ull << id))) {
             continue;
         }
         char number[12];
@@ -585,7 +701,7 @@ static int save_file(RigFile *f, LONG dirty) {
 
 /* The launcher (or an editor) changed the file: take over its values, except for settings
    that were just changed in the menu and still wait to be saved. */
-static void reload_file(RigFile *f, LONG pending) {
+static void reload_file(RigFile *f, LONG64 pending) {
     size_t length;
     int missing;
     if (!f->path || !read_file(f->path, file_buffer, FILE_LIMIT + 1, &length, &missing) ||
@@ -595,7 +711,7 @@ static void reload_file(RigFile *f, LONG pending) {
     int changed = 0;
     for (unsigned id = f->first; id < f->end; ++id) {
         int value;
-        if ((pending & (LONG)(1u << id)) ||
+        if ((pending & (LONG64)(1ull << id)) ||
             !ini_find_int(file_buffer, length, f->section, infos[id].key, &value) ||
             value < infos[id].minimum || value > infos[id].maximum) {
             continue;
@@ -615,23 +731,21 @@ static ULONGLONG last_check;
 
 static void saver_step(ULONGLONG now) {
     AcquireSRWLockExclusive(&file_lock);
-    if ((dirty_wheel || dirty_traffic) && now >= save_after) {
-        LONG wheel = InterlockedExchange(&dirty_wheel, 0);
-        LONG traffic = InterlockedExchange(&dirty_traffic, 0);
-        if (!save_file(&files[0], wheel)) {
-            InterlockedOr(&dirty_wheel, wheel);
-            save_after = now + 5000; /* retry later, e.g. while the file is locked */
-        }
-        if (!save_file(&files[1], traffic)) {
-            InterlockedOr(&dirty_traffic, traffic);
-            save_after = now + 5000;
+    if ((dirty_wheel || dirty_traffic || dirty_keyboard) && now >= save_after) {
+        volatile LONG64 *masks[3] = {&dirty_wheel, &dirty_traffic, &dirty_keyboard};
+        for (unsigned i = 0; i < ARRAY_COUNT(files); ++i) {
+            LONG64 dirty = InterlockedExchange64(masks[i], 0);
+            if (!save_file(&files[i], dirty)) {
+                InterlockedOr64(masks[i], dirty);
+                save_after = now + 5000; /* retry later, e.g. while the file is locked */
+            }
         }
     }
     if (now - last_check >= 1000) {
         last_check = now;
         for (unsigned i = 0; i < ARRAY_COUNT(files); ++i) {
             ULONGLONG time;
-            LONG pending = i == 0 ? dirty_wheel : dirty_traffic;
+            LONG64 pending = i == 0 ? dirty_wheel : i == 1 ? dirty_traffic : dirty_keyboard;
             if (modified_time(files[i].path, &time) && time != files[i].known_time) {
                 files[i].known_time = time;
                 reload_file(&files[i], pending);
@@ -655,10 +769,9 @@ void rig_settings_flush(void) {
     if (!started) {
         return;
     }
-    LONG wheel = InterlockedExchange(&dirty_wheel, 0);
-    LONG traffic = InterlockedExchange(&dirty_traffic, 0);
-    save_file(&files[0], wheel);
-    save_file(&files[1], traffic);
+    save_file(&files[0], InterlockedExchange64(&dirty_wheel, 0));
+    save_file(&files[1], InterlockedExchange64(&dirty_traffic, 0));
+    save_file(&files[2], InterlockedExchange64(&dirty_keyboard, 0));
 }
 
 void rig_settings_start(const wchar_t *settings_directory) {
@@ -667,6 +780,7 @@ void rig_settings_start(const wchar_t *settings_directory) {
         return;
     }
     files[0].path = wheel_bridge_ini_path();
+    files[2].path = keyboard_ini_path();
     for (unsigned i = 0; i < ARRAY_COUNT(files); ++i) {
         modified_time(files[i].path, &files[i].known_time);
     }
@@ -679,7 +793,7 @@ void rig_settings_start(const wchar_t *settings_directory) {
     CloseHandle(thread);
     started = 1;
     log_append("MENU: Lenkrad & Verkehr page ready (HUD options); changes apply live and are "
-               "saved to FH2_Lenkrad.ini / FH2_ExtraOptions.ini.\r\n");
+               "saved to FH2_Lenkrad.ini / FH2_Tastatur.ini / FH2_ExtraOptions.ini.\r\n");
 }
 
 #ifdef FH2_TWEAKS_TEST
@@ -693,6 +807,7 @@ __declspec(dllexport) int Fh2TestRigStart(unsigned char *image, const wchar_t *e
     traffic_tunables_start(image, &options);
     weather_start(image, &options);
     wheel_bridge_start(image, executable, directory);
+    keyboard_pad_game_start(image, directory);
     rig_settings_start(directory);
     return ok ? (started ? 1 : 2) : 0;
 }

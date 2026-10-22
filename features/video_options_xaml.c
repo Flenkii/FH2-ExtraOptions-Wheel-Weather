@@ -306,10 +306,11 @@ static void append_rig_resources(XamlBuffer *buffer, unsigned char *image) {
     append_number_slider_style(buffer, "EO_RigLock", "EO_RigNumber0", "30", "450", "10");
     append_number_slider_style(buffer, "EO_RigRotation", "EO_RigNumber0", "180", "2520", "30");
     append_number_slider_style(buffer, "EO_RigCurve", "EO_RigNumber1", "1", "6", "0.1");
+    append_number_slider_style(buffer, "EO_KeyTime", "EO_RigNumber0", "0", "1000", "10");
     append_percent_slider_style(buffer, "EO_RigPercent200", "2", "0.05");
     append_percent_slider_style(buffer, "EO_RigPercent100", "1", "0.05");
     append_percent_slider_style(buffer, "EO_RigPercent50", "0.5", "0.01");
-    for (unsigned position = 0; position < RIG_SETTING_COUNT; ++position) {
+    for (unsigned position = 0; position < rig_setting_menu_count(); ++position) {
         unsigned id = rig_setting_order(position);
         const RigSettingInfo *info = rig_setting_info(id);
         append_text(buffer, "<local:TileMenuDataItem x:Key=\"EO_");
@@ -323,12 +324,10 @@ static void append_rig_resources(XamlBuffer *buffer, unsigned char *image) {
 }
 
 static void append_rig_rows(XamlBuffer *buffer, unsigned char *image) {
-    for (unsigned position = 0; position < RIG_SETTING_COUNT; ++position) {
+    for (unsigned position = 0; position < rig_setting_menu_count(); ++position) {
         unsigned id = rig_setting_order(position);
         const RigSettingInfo *info = rig_setting_info(id);
-        if (info->kind == RIG_KIND_TOGGLE || info->kind == RIG_KIND_TRAFFIC ||
-            info->kind == RIG_KIND_PROFILE || info->kind == RIG_KIND_FUNCTION ||
-            info->kind == RIG_KIND_DENSITY || info->kind == RIG_KIND_WEATHER) {
+        if (rig_kind_is_choice(info->kind)) {
             append_text(buffer, "<local:SpinnerControl Tag=\"{StaticResource EO_");
             append_text(buffer, info->property);
             append_text(buffer, "}\" Style=\"{StaticResource A_Style_SpinnerControl_Default}\" "
@@ -337,12 +336,7 @@ static void append_rig_rows(XamlBuffer *buffer, unsigned char *image) {
             append_text(buffer, "\" SelectedIndex=\"{Binding ");
             append_text(buffer, info->property);
             append_text(buffer, "}\" ItemsSource=\"{Binding ");
-            append_text(buffer, info->kind == RIG_KIND_TRAFFIC    ? "TrafficChoices"
-                                : info->kind == RIG_KIND_PROFILE  ? "ProfileChoices"
-                                : info->kind == RIG_KIND_DENSITY  ? "DensityChoices"
-                                : info->kind == RIG_KIND_WEATHER  ? "WeatherChoices"
-                                : info->kind == RIG_KIND_FUNCTION ? "FunctionChoices"
-                                                                  : "ToggleChoices");
+            append_text(buffer, rig_kind_collection(info->kind));
             append_text(buffer, "}\"/>");
         } else {
             append_text(buffer, "<Slider Value=\"{Binding ");

@@ -1,0 +1,38 @@
+FH2 Extra Options (inoffizieller Fork) – Tastenbelegung / Keyboard bindings
+==========================================================================
+Standard-Belegung. Ändern: FH2_Tastatur.ini im Azimuth-Ordner (mehrere Tasten mit Komma,
+z. B. Gas=W,Hoch; die Tastennamen stehen oben in der Datei).
+Default bindings. Change them in FH2_Tastatur.ini next to azimuth.exe.
+
+FAHREN / DRIVING
+  W                  Gas                          Throttle
+  S                  Bremse / Rückwärts           Brake / reverse
+  A / D              Lenken                       Steer
+  Leertaste          Handbremse                   Space: handbrake
+  E / Q              Hoch- / Runterschalten       Shift up / down
+  Linke Shift-Taste  Kupplung                     Left Shift: clutch
+
+KAMERA & BLICK / CAMERA & LOOK
+  Pfeiltasten        Kamera bewegen (beim Fahren) Arrow keys: camera (while driving)
+  Tab                Kamera wechseln              Change camera
+  C oder Num2        Blick zurück                 Look back
+  Num4 / Num6        Blick links / rechts         Look left / right
+
+FUNKTIONEN / FUNCTIONS
+  R                  Zurückspulen                 Rewind
+  T                  Telemetrie                   Telemetry
+  P                  Fotomodus                    Photo mode
+  L                  Licht                        Headlights
+  M                  Karte                        Map
+  Minus / Plus       Radio zurück / weiter        Radio previous / next
+
+MENÜS / MENUS
+  Pfeiltasten        Blättern                     Arrow keys: navigate
+  Enter              Bestätigen (A)               Confirm (A)
+  Rücktaste          Zurück (B)                   Backspace: back (B)
+  Esc                Pause / Menü                 Pause / menu
+  X / Y              Tasten X / Y                 Buttons X / Y
+  Bild↑ / Bild↓      Reiter links / rechts        Page Up / Down: tabs left / right (LB / RB)
+
+Hinweis: Ist ein Lenkrad angeschlossen, fährt das Spiel mit dem Lenkrad.
+Note: while a wheel is connected, the game drives with the wheel.

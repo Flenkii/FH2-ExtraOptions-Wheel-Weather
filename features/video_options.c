@@ -91,6 +91,7 @@ enum {
     CHOICES_FUNCTION,
     CHOICES_DENSITY,
     CHOICES_WEATHER,
+    CHOICES_FFB_MODE,
     CHOICE_COLLECTION_COUNT
 };
 
@@ -111,7 +112,7 @@ static NativePropertyLink links[2][PROPERTY_COUNT];
 static void *choices[CHOICE_COLLECTION_COUNT];
 static const unsigned choice_counts[] = {3, 2, 6, 2, 3, 2, 3, 2, 2, 2, 6, RIG_PROFILE_COUNT,
                                         WHEEL_FUNCTION_COUNT, RIG_DENSITY_COUNT,
-                                        RIG_WEATHER_COUNT};
+                                        RIG_WEATHER_COUNT, RIG_FFB_MODE_COUNT};
 _Static_assert(ARRAY_COUNT(choice_counts) == CHOICE_COLLECTION_COUNT, "choice counts");
 static void *registered_image[2], *initialized_image;
 static void *resource_vtable[7];
@@ -161,7 +162,8 @@ static const char *const property_names[] = {"DriftMode",
                                              "ProfileChoices",
                                              "FunctionChoices",
                                              "DensityChoices",
-                                             "WeatherChoices"};
+                                             "WeatherChoices",
+                                             "FfbModeChoices"};
 _Static_assert(ARRAY_COUNT(property_names) == RIG_PROPERTY_BASE, "property names");
 
 static const char *property_name(unsigned index) {
@@ -173,9 +175,7 @@ static const char *property_name(unsigned index) {
 }
 
 static int rig_is_index(unsigned kind) {
-    return kind == RIG_KIND_TOGGLE || kind == RIG_KIND_TRAFFIC || kind == RIG_KIND_PROFILE ||
-           kind == RIG_KIND_FUNCTION || kind == RIG_KIND_DENSITY ||
-           kind == RIG_KIND_WEATHER;
+    return rig_kind_is_choice(kind);
 }
 
 static void release_object(void *object) {
@@ -327,6 +327,8 @@ static const wchar_t *choice_text(unsigned collection, unsigned index) {
             return rig_density_choice(image, index);
         case CHOICES_WEATHER:
             return rig_weather_choice(image, index);
+        case CHOICES_FFB_MODE:
+            return rig_ffb_mode_choice(image, index);
     }
     return NULL;
 }

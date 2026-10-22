@@ -246,6 +246,18 @@ check(table1 == {17: 14, 13: 15, 11: 8, 12: 9}, f'Layout 1: Kamera=X, Blick zur�
 m = new_map(e)
 call_layout_site(e, 0x2fd673, m, 0, 2)  # back to layout 0 for the rest
 
+print('Controller-Layout für die Tastatur (Art 1)')
+ctl = lambda a: (lambda v: v - (1 << 32) if v >= 1 << 31 else v)(e.call('Fh2TestControllerActionInput', a) & 0xffffffff)
+check([ctl(a) for a in (0, 1, 3, 4, 5, 6, 17, 20)] == [11, 10, 12, 13, 14, 8, 9, 15],
+      'Layout 0: Gas=RT, Bremse=LT, Handbremse=A, hoch=B, runter=X, Kupplung=LB, Kamera=RB, Zurückspulen=Y')
+m = new_map(e)
+call_layout_site(e, 0x2fd673, m, 2, 1)
+check(sorted(bindings(e, m)) == sorted((0, a, i) for a, i in layout_rows('ControllerLayouts', 2)), 'Controller-Layout 2 bleibt unverändert')
+check([ctl(a) for a in (3, 4, 5)] == [14, 13, 12], f'Layout 2: Handbremse=X, hoch=B, runter=A -> Tastatur folgt: {[ctl(a) for a in (3, 4, 5)]}')
+m = new_map(e)
+call_layout_site(e, 0x2fd673, m, 0, 1)
+check([ctl(a) for a in (3, 4, 5)] == [12, 13, 14], 'zurück auf Layout 0')
+
 print('Zusatztasten -> Spiel')
 def report(buttons):
     v = e.call('Fh2TestWheelReport', buttons)

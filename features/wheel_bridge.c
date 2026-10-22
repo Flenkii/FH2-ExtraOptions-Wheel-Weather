@@ -16,6 +16,7 @@
  *
  * Nothing on disk is modified. If no wheel is found, the game is left alone. */
 #include "logging.h"
+#include "ffb_vm.h"
 #include "rig_settings.h"
 #include "wheel_buttons.h"
 #include "support.h"
@@ -267,6 +268,7 @@ typedef struct {
     int gear[7]; /* 1..6, reverse */
     int ffb, lock, centering, damping, ffb_csv, strength, rumble, ffb_sign, curve10, outward;
     int smoothing, friction, minforce;
+    int ffb_mode; /* 0 = the game's own wheel programs (like on the Xbox), 1 = own FFB (old) */
     int extra_button[WHEEL_EXTRA_BUTTONS], extra_function[WHEEL_EXTRA_BUTTONS];
     wchar_t device[128];
 } WheelConfig;
@@ -317,9 +319,9 @@ static int read_axis(const wchar_t *key, int fallback) {
 
 static const char default_ini[] =
     "; FH2 Lenkrad-Bruecke (inoffiziell) - Einstellungen\r\n"
-    "; Aenderungen wirken beim naechsten Spielstart.\r\n"
+    "; Die wichtigsten Werte gibt es auch im Spiel: Optionen > HUD > ganz unten.\r\n"
     "[Lenkrad]\r\n"
-    "; 1 = Lenkrad ans Spiel durchreichen, 0 = aus\r\n"
+    "; 1 = Lenkrad ans Spiel durchreichen, 0 = aus (dann fahren Tastatur/Controller); wirkt nach Neustart\r\n"
     "Aktiv=1\r\n"
     "; Teil des Geraetenamens (leer = automatisch, z.B. G920)\r\n"
     "Geraet=\r\n"
@@ -340,8 +342,8 @@ static const char default_ini[] =
     "WippeLinks=5\r\n"
     "TasteMenu=6\r\n"
     "TasteView=7\r\n"
-    "; H-Schaltung (Driving Force Shifter): 1 = an\r\n"
-    "Schaltknauf=1\r\n"
+    "; H-Schaltung (Driving Force Shifter): FH2 nutzt sie nicht, deshalb aus (0)\r\n"
+    "Schaltknauf=0\r\n"
     "Gang1=12\r\n"
     "Gang2=13\r\n"
     "Gang3=14\r\n"
@@ -350,8 +352,12 @@ static const char default_ini[] =
     "Gang6=17\r\n"
     "Rueckwaerts=18\r\n"
     "RueckwaertsWert=255\r\n"
-    "; Force Feedback (experimentell, noch ohne Wirkung): 0 = aus\r\n"
-    "ForceFeedback=0\r\n"
+    "; Force Feedback: 1 = an, 0 = aus\r\n"
+    "ForceFeedback=1\r\n"
+    "; Das Force Feedback ist das originale des Spiels (seine Lenkrad-Programme, wie auf der Xbox).\r\n"
+    "; Staerke in Prozent (100 = wie auf der Xbox), Vibration in Prozent\r\n"
+    "FFBStaerke=100\r\n"
+    "Vibration=100\r\n"
     "; Freie Tasten (Nummern siehe Log, -1 = keine): G920 RSB=8, LSB=9, Xbox-Taste=10\r\n"
     "ZusatzTaste1=8\r\n"
     "ZusatzTaste2=9\r\n"
@@ -391,7 +397,7 @@ static void config_load(void) {
     cfg.btn_paddle_left = read_int(L"WippeLinks", 5);
     cfg.btn_menu = read_int(L"TasteMenu", 6);
     cfg.btn_view = read_int(L"TasteView", 7);
-    cfg.shifter = read_int(L"Schaltknauf", 1);
+    cfg.shifter = read_int(L"Schaltknauf", 0);
     static const wchar_t *const gear_keys[7] = {L"Gang1", L"Gang2", L"Gang3", L"Gang4",
                                                 L"Gang5", L"Gang6", L"Rueckwaerts"};
     for (int g = 0; g < 7; ++g) cfg.gear[g] = read_int(gear_keys[g], 12 + g);
@@ -411,6 +417,7 @@ static void config_load(void) {
     cfg.smoothing = read_int(L"Glaettung", 35);     /* ms Glaettung der Spielkraft (Schlaege gehen durch) */
     cfg.friction = read_int(L"Reibung", 4);         /* % Lenkungsreibung */
     cfg.minforce = read_int(L"Mindestkraft", 2);    /* % gegen die tote Zone des G920-Getriebes */
+    cfg.ffb_mode = read_int(L"FFBModus", 0) == 1 ? 1 : 0;
     cfg.log = read_int(L"Log", 1);
     /* free wheel buttons: G920 RSB = 8, LSB = 9, Xbox button = 10 (DirectInput numbers) */
     static const wchar_t *const extra_keys[WHEEL_EXTRA_BUTTONS] = {L"ZusatzTaste1", L"ZusatzTaste2",
@@ -459,6 +466,7 @@ static int *cfg_field(unsigned id) {
         case RIG_WHEEL_BUTTON1: return &cfg.extra_function[0];
         case RIG_WHEEL_BUTTON2: return &cfg.extra_function[1];
         case RIG_WHEEL_BUTTON3: return &cfg.extra_function[2];
+        case RIG_WHEEL_FFB_MODE: return &cfg.ffb_mode;
     }
     return NULL;
 }
@@ -927,6 +935,159 @@ static void *outer_vtbl[9] = {(void *)outer_qi,   (void *)static_addref, (void *
 
 
 
+/* ------------------------------------------------------------------ the game's wheel programs (real FFB)
+
+   FH2 talks to the wheel like on the Xbox: it registers named parameters (IWheel slot 36),
+   uploads small force feedback programs (slot 26) and then sets the parameters every frame
+   (slot 38, followed by a commit). Microsoft's Wheel DLL turns that into GIP messages for the
+   wheel's firmware, which runs the programs. These three methods are hooked here so the very
+   same programs and values run in ffb_vm.c on the PC - the forces come from the game itself. */
+
+#define WHEEL_VTABLE_RVA 0x15760u
+#define WHEEL_RAWBUFFER_IAT 0x14198u
+#define SLOT_SET_PROGRAM 26
+#define SLOT_ADD_PARAMETER 36
+#define SLOT_SET_PARAMETER 38
+static const unsigned wheel_method_rva[3] = {0x8540u, 0x8ab0u, 0x8c10u};
+
+typedef HRESULT(WINAPI *SetProgramFn)(void *, UINT8, void *, UINT32, void *);
+typedef HRESULT(WINAPI *AddParameterFn)(void *, void *);
+typedef HRESULT(WINAPI *SetParameterFn)(void *, void *, float);
+typedef const wchar_t *(WINAPI *RawBufferFn)(void *, UINT32 *);
+
+static FfbVm game_vm;
+static SRWLOCK vm_lock = SRWLOCK_INIT;
+static SetProgramFn original_set_program;
+static AddParameterFn original_add_parameter;
+static SetParameterFn original_set_parameter;
+static RawBufferFn raw_buffer;
+static volatile LONG game_ffb_hooked, programs_loaded, parameter_sets;
+
+static const wchar_t *hstring_text(void *hstring, UINT32 *length) {
+    *length = 0;
+    if (!raw_buffer || !hstring) return NULL;
+    const wchar_t *text = NULL;
+    __try {
+        text = raw_buffer(hstring, length);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        text = NULL;
+        *length = 0;
+    }
+    return text;
+}
+
+static void log_wide(const char *label, const wchar_t *text, UINT32 length) {
+    char line[700];
+    unsigned n = 0;
+    for (UINT32 i = 0; i < length && n < sizeof(line) - 1; ++i) line[n++] = text[i] < 128 ? (char)text[i] : '?';
+    line[n] = 0;
+    wlog("%s%s", label, line);
+}
+
+static HRESULT WINAPI hook_set_program(void *self, UINT8 slot, void *program, UINT32 flags, void *out) {
+    UINT32 length;
+    const wchar_t *text = hstring_text(program, &length);
+    if (text && slot < FFB_VM_SLOTS) {
+        size_t error_at = 0;
+        AcquireSRWLockExclusive(&vm_lock);
+        int ok = ffb_vm_load(&game_vm, slot, text, length, &error_at);
+        ReleaseSRWLockExclusive(&vm_lock);
+        LONG count = InterlockedIncrement(&programs_loaded);
+        if (count <= 40) {
+            char label[64] = "Spiel-FFB: Programm ";
+            unsigned n = 20;
+            if (slot >= 10) label[n++] = (char)('0' + slot / 10);
+            label[n++] = (char)('0' + slot % 10);
+            const char *tail = ok ? " geladen: " : " NICHT verstanden (bleibt aus): ";
+            while (*tail && n < sizeof(label) - 1) label[n++] = *tail++;
+            label[n] = 0;
+            log_wide(label, text, length);
+            if (!ok) wlog("Spiel-FFB: Fehler ab Zeichen %u.", (unsigned)error_at);
+        }
+    }
+    return original_set_program(self, slot, program, flags, out);
+}
+
+static HRESULT WINAPI hook_add_parameter(void *self, void *name) {
+    UINT32 length;
+    const wchar_t *text = hstring_text(name, &length);
+    if (text) {
+        AcquireSRWLockExclusive(&vm_lock);
+        int index = ffb_vm_param(&game_vm, text, length);
+        ReleaseSRWLockExclusive(&vm_lock);
+        char label[48] = "Spiel-FFB: Parameter ";
+        unsigned n = 21;
+        if (index >= 10) label[n++] = (char)('0' + index / 10);
+        label[n++] = (char)('0' + (index < 0 ? 0 : index % 10));
+        label[n++] = ' ';
+        label[n++] = '=';
+        label[n++] = ' ';
+        label[n] = 0;
+        log_wide(label, text, length);
+    }
+    return original_add_parameter(self, name);
+}
+
+static HRESULT WINAPI hook_set_parameter(void *self, void *name, float value) {
+    UINT32 length;
+    const wchar_t *text = hstring_text(name, &length);
+    if (text) {
+        AcquireSRWLockShared(&vm_lock);
+        int index = -1;
+        for (unsigned i = 0; i < game_vm.param_count && index < 0; ++i) {
+            const wchar_t *n = game_vm.param[i].name;
+            UINT32 k = 0;
+            while (k < length && n[k] == text[k]) ++k;
+            if (k == length && !n[k]) index = (int)i;
+        }
+        if (index >= 0) ffb_vm_set_param(&game_vm, index, value);
+        ReleaseSRWLockShared(&vm_lock);
+        if (index < 0) { /* not registered through slot 36 (should not happen): add it */
+            AcquireSRWLockExclusive(&vm_lock);
+            ffb_vm_set_param(&game_vm, ffb_vm_param(&game_vm, text, length), value);
+            ReleaseSRWLockExclusive(&vm_lock);
+        }
+        InterlockedIncrement(&parameter_sets);
+    }
+    return original_set_parameter(self, name, value);
+}
+
+/* Patches the three methods in the Wheel DLL's IWheel method table (our own mapping of it). */
+static void hook_wheel_methods(void) {
+    void *wheel = NULL;
+    if (!wheel_image || ((QIFn)VT(inner)[0])(inner, &IID_Wheel, &wheel) < 0 || !wheel) {
+        wlog("Spiel-FFB: IWheel nicht erreichbar - eigenes FFB wird benutzt.");
+        return;
+    }
+    void **table = VT(wheel);
+    ((RefFn)VT(wheel)[2])(wheel);
+    static const unsigned slots[3] = {SLOT_SET_PROGRAM, SLOT_ADD_PARAMETER, SLOT_SET_PARAMETER};
+    int expected = table == (void **)(wheel_image + WHEEL_VTABLE_RVA);
+    for (unsigned i = 0; i < 3 && expected; ++i)
+        expected = table[slots[i]] == (void *)(wheel_image + wheel_method_rva[i]);
+    raw_buffer = *(RawBufferFn *)(wheel_image + WHEEL_RAWBUFFER_IAT);
+    if (!expected || !raw_buffer) {
+        wlog("Spiel-FFB: unbekannte Wheel-DLL - eigenes FFB wird benutzt.");
+        return;
+    }
+    DWORD old, ignored;
+    if (!VirtualProtect(table + SLOT_SET_PROGRAM, (SLOT_SET_PARAMETER - SLOT_SET_PROGRAM + 1) * sizeof(void *),
+                        PAGE_READWRITE, &old)) {
+        wlog("Spiel-FFB: Methodentabelle nicht beschreibbar - eigenes FFB wird benutzt.");
+        return;
+    }
+    original_set_program = (SetProgramFn)table[SLOT_SET_PROGRAM];
+    original_add_parameter = (AddParameterFn)table[SLOT_ADD_PARAMETER];
+    original_set_parameter = (SetParameterFn)table[SLOT_SET_PARAMETER];
+    table[SLOT_SET_PROGRAM] = (void *)hook_set_program;
+    table[SLOT_ADD_PARAMETER] = (void *)hook_add_parameter;
+    table[SLOT_SET_PARAMETER] = (void *)hook_set_parameter;
+    VirtualProtect(table + SLOT_SET_PROGRAM, (SLOT_SET_PARAMETER - SLOT_SET_PROGRAM + 1) * sizeof(void *), old,
+                   &ignored);
+    game_ffb_hooked = 1;
+    wlog("Spiel-FFB: Lenkrad-Programme des Spiels werden mitgelesen.");
+}
+
 /* ------------------------------------------------------------------ vector wrapper */
 
 typedef struct {
@@ -1364,7 +1525,7 @@ static void send_static_config(void) {
     p[4] = 0;                               /* handbrake bits (none) */
     *(uint16_t *)(p + 5) = (uint16_t)cfg.rotation; /* min rotation */
     *(uint16_t *)(p + 7) = (uint16_t)cfg.rotation; /* max rotation */
-    p[9] = cfg.ffb ? 1 : 0;                 /* force feedback */
+    p[9] = 1;                               /* force feedback (switched off by setting 0 force) */
     p[0xa] = 0;                             /* flags: rotation not changeable */
     HRESULT hr = ((OnInputFn)VT(input_handler)[6])(input_handler, sizeof(packet), packet);
     wlog("Statische Lenkrad-Konfiguration gesendet -> %X", (unsigned)hr);
@@ -1538,11 +1699,82 @@ __attribute__((unused)) static void set_condition(IDirectInputEffect *e, LONG co
    p7/p9 = rumble amplitudes with frequencies p8 (38 Hz) / p10 (21 Hz). */
 static volatile LONG last_steer_raw = 32768;
 static ULONGLONG last_vel_at;
+
+/* program output Af (in the game's frame) -> DirectInput force towards +X (before force_sign).
+   Only the game's force: no own centring, lock or minimum force. The one addition is a
+   protection of the hardware: never push further into the end stop. */
+static long game_force(float af, double x) {
+    int sign = cfg.invert_steering ? -1 : 1;
+    double total = (double)af * sign * 10000.0 * (double)cfg.strength / 100.0;
+    if ((x > 0.97 && total > 0) || (x < -0.97 && total < 0)) total = 0;
+    if (total > 10000.0) total = 10000.0;
+    if (total < -10000.0) total = -10000.0;
+    if (!cfg.ffb) total = 0.0;
+    return (long)(total + (total >= 0.0 ? 0.5 : -0.5));
+}
+
+/* FFB-Art "Spiel": the game's own programs run every 10 ms, their output Af drives the motor
+   (Af = 1 is the wheel's full force, like on the Xbox; FFB-Staerke scales it). */
+static void ffb_update_game(ULONGLONG now) {
+    static ULONGLONG last_tick;
+    static int last_rumble = -1, logged;
+    if (cfg.rumble != last_rumble) {
+        last_rumble = cfg.rumble;
+        float scale = (float)cfg.rumble / 100.0f;
+        AcquireSRWLockExclusive(&vm_lock);
+        ffb_vm_set_scale(&game_vm, L"LeftAmplitude", scale);
+        ffb_vm_set_scale(&game_vm, L"RightAmplitude", scale);
+        ReleaseSRWLockExclusive(&vm_lock);
+    }
+    if (!last_tick || now - last_tick > 200) last_tick = now - FFB_VM_TICK_MS;
+    int sign = cfg.invert_steering ? -1 : 1;
+    double x = ((double)last_steer_raw - 32768.0) / 32768.0; /* physical position, -1..1 */
+    static float af;
+    unsigned ticks = 0;
+    AcquireSRWLockShared(&vm_lock);
+    while (now - last_tick >= FFB_VM_TICK_MS && ticks < 5) {
+        af = ffb_vm_tick(&game_vm, (float)(x * sign));
+        last_tick += FFB_VM_TICK_MS;
+        ++ticks;
+    }
+    unsigned loaded = ffb_vm_loaded(&game_vm);
+    ReleaseSRWLockShared(&vm_lock);
+    if (!ticks) return;
+    if (!logged && loaded) {
+        logged = 1;
+        wlog("Spiel-FFB aktiv: %u Programme laufen alle 10 ms (Staerke %d%%, Vibration %d%%).", loaded,
+             cfg.strength, cfg.rumble);
+    }
+    long force = game_force(af, x) * force_sign;
+    static long last_force = 1;
+    if (ffb_fresh) {
+        ffb_fresh = 0;
+        last_force = 1;
+        set_periodic(fx_rumble_a, 0, 26000); /* rumble is part of the programs' output */
+        set_periodic(fx_rumble_b, 0, 47000);
+    }
+    if (force > last_force + 20 || force < last_force - 20 || (force == 0 && last_force != 0)) {
+        set_constant(fx_force, force);
+        last_force = force;
+    }
+}
+
 static void ffb_update(void) {
     static ULONGLONG last;
     ULONGLONG now = GetTickCount64();
     if (ffb_state != 1 || now - last < 4) return;
     last = now;
+    static int mode_logged = -1;
+    int game_mode = cfg.ffb_mode == 0 && game_ffb_hooked;
+    if (game_mode != mode_logged) {
+        mode_logged = game_mode;
+        ffb_fresh = 1;
+        wlog("FFB-Art: %s", game_mode ? "Spiel (originale Lenkrad-Programme von FH2)" : "Eigenes FFB der Mod");
+    }
+    if (game_mode) {
+        ffb_update_game(now);
+        return;
+    }
     int driving = (ffb_seen & 1) && ffb_param[0] > 0.5f;
     float torque = (cfg.ffb && (ffb_seen & 2)) ? ffb_param[1] : 0.0f;
     float weight = (ffb_seen & 8) ? ffb_param[3] : 0.0f;
@@ -1869,11 +2101,11 @@ static void live_apply(void) {
 static void live_log(ULONGLONG now) {
     if (!live_log_at || now < live_log_at) return;
     live_log_at = 0;
-    wlog("Ingame-Menue: FFB=%d Staerke=%d Vibration=%d Daempfung=%d Reibung=%d Glaettung=%d "
+    wlog("Ingame-Menue: FFB=%d FFBModus=%d Staerke=%d Vibration=%d Daempfung=%d Reibung=%d Glaettung=%d "
          "Mindestkraft=%d KraftNachAussen=%d Zentrierung=%d Anschlag=%d Kurve=%d Drehwinkel=%d "
          "Schaltknauf=%d",
-         cfg.ffb, cfg.strength, cfg.rumble, cfg.damping, cfg.friction, cfg.smoothing, cfg.minforce,
-         cfg.outward, cfg.centering, cfg.lock, cfg.curve10, cfg.rotation, cfg.shifter);
+         cfg.ffb, cfg.ffb_mode, cfg.strength, cfg.rumble, cfg.damping, cfg.friction, cfg.smoothing,
+         cfg.minforce, cfg.outward, cfg.centering, cfg.lock, cfg.curve10, cfg.rotation, cfg.shifter);
 }
 
 /* ------------------------------------------------------------------ reconnect (cable pulled / USB hiccup) */
@@ -2168,6 +2400,8 @@ static void bridge_setup_inner(void) {
         wlog("FEHLER: IInputHandler %X", (unsigned)hr);
         return;
     }
+    ffb_vm_reset(&game_vm);
+    hook_wheel_methods();
     send_static_config();
     JoyState neutral;
     zero(&neutral, sizeof(neutral));
@@ -2311,6 +2545,31 @@ void wheel_bridge_shutdown(void) {
 }
 
 #ifdef FH2_TWEAKS_TEST
+/* game FFB: hook a fake Wheel DLL image (method table at +0x15760, raw-buffer import at +0x14198) */
+__declspec(dllexport) int Fh2TestGameFfbHook(unsigned char *fake_image, void *fake_inner) {
+    wheel_image = fake_image;
+    inner = fake_inner;
+    ffb_vm_reset(&game_vm);
+    game_ffb_hooked = 0;
+    hook_wheel_methods();
+    return game_ffb_hooked;
+}
+__declspec(dllexport) unsigned Fh2TestGameFfbTick(float position) {
+    float af = ffb_vm_tick(&game_vm, position);
+    unsigned bits;
+    memory_copy(&bits, &af, 4);
+    return bits;
+}
+__declspec(dllexport) unsigned Fh2TestGameFfbLoaded(void) {
+    return ffb_vm_loaded(&game_vm);
+}
+__declspec(dllexport) long Fh2TestGameForce(float af, int x_permille) {
+    return game_force(af, x_permille / 1000.0);
+}
+__declspec(dllexport) void Fh2TestWheelSet(unsigned id, int value) {
+    int *field = cfg_field(id);
+    if (field) *field = value;
+}
 /* wheel report bytes 0/1 for the given DirectInput buttons (bit n = button n) */
 __declspec(dllexport) unsigned Fh2TestWheelReport(unsigned buttons) {
     JoyState s;

@@ -23,11 +23,18 @@ enum {
     RIG_WHEEL_BUTTON1,   /* ZusatzFunktion1  WHEEL_FUNCTION_* of extra button 1 (RSB) */
     RIG_WHEEL_BUTTON2,   /* ZusatzFunktion2  extra button 2 (LSB) */
     RIG_WHEEL_BUTTON3,   /* ZusatzFunktion3  extra button 3 (Xbox button) */
+    RIG_WHEEL_FFB_MODE,  /* FFBModus         0 = the game's wheel programs, 1 = own FFB */
     RIG_WHEEL_COUNT,
     RIG_TRAFFIC_LEVEL = RIG_WHEEL_COUNT, /* [Traffic] TrafficLevel   0..5 */
     RIG_TRAFFIC_ALL_DAY,                 /* [Traffic] RushHourAllDay 0/1 */
     RIG_WEATHER,                         /* [Traffic] Wetter         0..5 (weather.h) */
-    RIG_WHEEL_PROFILE,                   /* FFB profile: not stored, derived from the FFB values */
+    RIG_KEY_FIRST,                       /* FH2_Tastatur.ini [Tastatur], keyboard_pad.h order */
+    RIG_KEY_ENABLED = RIG_KEY_FIRST,     /* Aktiv                0/1, next game start */
+    RIG_KEY_STEER,                       /* Lenkzeit             ms */
+    RIG_KEY_RETURN,                      /* Rueckstellzeit       ms */
+    RIG_KEY_PEDAL,                       /* Pedalzeit            ms */
+    RIG_KEY_END,
+    RIG_WHEEL_PROFILE = RIG_KEY_END,     /* FFB profile: not stored, derived from the FFB values */
     RIG_TRAFFIC_PRESET,                  /* traffic preset: not stored, derived from level + rush hour */
     RIG_SETTING_COUNT
 };
@@ -42,11 +49,17 @@ enum {
     RIG_KIND_FUNCTION, /* SpinnerControl, FunctionChoices (free wheel buttons) */
     RIG_KIND_DENSITY,  /* SpinnerControl, DensityChoices (traffic presets) */
     RIG_KIND_WEATHER,  /* SpinnerControl, WeatherChoices */
+    RIG_KIND_FFB_MODE, /* SpinnerControl, FfbModeChoices */
 };
+
+/* kinds shown as a list of choices (SpinnerControl) and the name of their collection */
+int rig_kind_is_choice(unsigned kind);
+const char *rig_kind_collection(unsigned kind);
 
 #define RIG_PROFILE_COUNT 6
 #define RIG_DENSITY_COUNT 6
 #define RIG_WEATHER_COUNT 6
+#define RIG_FFB_MODE_COUNT 2
 
 typedef struct {
     const char *property; /* binding name on the options page */
@@ -72,7 +85,10 @@ const wchar_t *rig_profile_choice(unsigned char *game_image, unsigned index);
 const wchar_t *rig_density_choice(unsigned char *game_image, unsigned index);
 const wchar_t *rig_weather_choice(unsigned char *game_image, unsigned index);
 const wchar_t *rig_function_choice(unsigned char *game_image, unsigned index);
-/* Menu order of the settings (the profile sits right below Force Feedback). */
+const wchar_t *rig_ffb_mode_choice(unsigned char *game_image, unsigned index);
+/* Rows of the menu: rig_setting_order(0 .. rig_setting_menu_count() - 1) are setting ids.
+   Settings that are not listed keep working from their INI files but are not shown. */
+unsigned rig_setting_menu_count(void);
 unsigned rig_setting_order(unsigned position);
 
 /* Provided by the wheel bridge and the traffic watcher. */

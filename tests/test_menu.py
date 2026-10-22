@@ -8,6 +8,10 @@ USER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixture')  # fe
 HUD = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_HUDOptions.xaml')
 VIDEO = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_VideoOptions.xaml')
 fails = []
+# setting ids (rig_settings.h)
+FFB_MODE, LEVEL, ALLDAY, WEATHER = 17, 18, 19, 20
+KEY_ENABLED, KEY_STEER, KEY_RETURN, KEY_PEDAL = 21, 22, 23, 24
+PROFILE, PRESET = 25, 26
 
 def check(cond, text):
     print(('  ok   ' if cond else '  FAIL ') + text)
@@ -94,17 +98,21 @@ except Exception as ex:
     dom = None
     check(False, f'HUD-XAML wohlgeformt: {ex}')
 open(os.path.join(tempfile.gettempdir(), 'hud_de.xaml'), 'wb').write(hud)
-props = ['EoRigWheelEnabled', 'EoRigForceFeedback', 'EoRigProfile', 'EoRigStrength', 'EoRigRumble', 'EoRigDamping',
-         'EoRigFriction', 'EoRigSmoothing', 'EoRigMinimumForce', 'EoRigOutward', 'EoRigCentering',
-         'EoRigLock', 'EoRigCurve', 'EoRigRotation', 'EoRigShifter', 'EoRigButton1', 'EoRigButton2', 'EoRigButton3',
-         'EoRigDensity', 'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather']
+props = ['EoRigWheelEnabled', 'EoRigForceFeedback', 'EoRigStrength', 'EoRigRumble', 'EoRigRotation',
+         'EoRigButton1', 'EoRigButton2', 'EoRigButton3', 'EoKeyEnabled', 'EoKeySteer',
+         'EoKeyReturn', 'EoKeyPedal', 'EoRigDensity',
+         'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather']
+hidden = ['EoRigFfbMode', 'EoRigProfile', 'EoRigDamping', 'EoRigFriction', 'EoRigSmoothing', 'EoRigMinimumForce',
+          'EoRigOutward', 'EoRigCentering', 'EoRigLock', 'EoRigCurve', 'EoRigShifter']
 if dom:
     lst = [n for n in dom.getElementsByTagName('local:CommonListBox') if n.getAttribute('x:Name') == 'OptionsList'][0]
     rows = [n for n in lst.childNodes if n.nodeType == n.ELEMENT_NODE]
     bindings = [(r.getAttribute('SelectedIndex') or r.getAttribute('Value')) for r in rows]
-    rig = [b for b in bindings if 'EoRig' in b]
+    rig = [b for b in bindings if b[len('{Binding '):-1] in props]
     check(rig == ['{Binding %s}' % p for p in props], f'{len(rig)} neue Zeilen in richtiger Reihenfolge am Ende der Liste')
     check(bindings[-len(props):] == rig, 'neue Zeilen stehen ganz unten (nach Drift/FOV/EO)')
+    check(not [b for b in bindings if b[len('{Binding '):-1] in hidden] and not any(('EO_' + h).encode() in hud for h in hidden),
+          'keine Zeilen mehr für das alte FFB (Art, Profil, Dämpfung, Reibung, ...)')
     keys = {n.getAttribute('x:Key') for n in dom.getElementsByTagName('*') if n.getAttribute('x:Key')}
     used = set()
     for n in dom.getElementsByTagName('*'):
@@ -119,15 +127,22 @@ if dom:
         used.add(conv.decode())
     check(used <= keys, f'alle EO-Ressourcen definiert ({len(used)} benutzt): fehlend {sorted(used - keys)}')
     headings = [n.getAttribute('Heading') for n in dom.getElementsByTagName('local:TileMenuDataItem')
-                if n.getAttribute('x:Key').startswith('EO_EoRig')]
-    check(headings[2] == 'Lenkrad: FFB-Profil' and headings[3] == 'Lenkrad: FFB-Stärke' and headings[18] == 'Verkehr: Voreinstellung' and headings[19] == 'Verkehr: Menge' and headings[15] == 'Lenkrad: Taste RSB', f'deutsche Texte: {headings[2]!r}, {headings[3]!r}, {headings[15]!r}, {headings[18]!r}')
-    prof = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding EoRigProfile}'][0]
-    check(prof.getAttribute('ItemsSource') == '{Binding ProfileChoices}', 'Profil-Zeile nutzt ProfileChoices')
+                if n.getAttribute('x:Key')[3:] in props]
+    want = {2: 'Lenkrad: FFB-Stärke', 4: 'Lenkrad: Drehwinkel (Grad)', 5: 'Lenkrad: Taste RSB',
+            8: 'Tastatur: Tastatur', 11: 'Tastatur: Pedalzeit (ms)', 12: 'Verkehr: Voreinstellung',
+            13: 'Verkehr: Menge', 15: 'Wetter'}
+    check(all(headings[i] == t for i, t in want.items()), 'deutsche Texte: ' + ', '.join(repr(headings[i]) for i in want))
+    for name, coll in (('EoRigButton1', 'FunctionChoices'), ('EoKeyEnabled', 'ToggleChoices')):
+        row = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding %s}' % name][0]
+        check(row.getAttribute('ItemsSource') == '{Binding %s}' % coll, f'{name} nutzt {coll}')
+    for name, style in (('EoKeySteer', 'EO_KeyTime'), ('EoKeyPedal', 'EO_KeyTime')):
+        row = [r for r in rows if r.getAttribute('Value') == '{Binding %s}' % name][0]
+        check(row.getAttribute('Style') == '{StaticResource %s}' % style, f'{name} ist ein Schieberegler ({style})')
     check(hud.startswith(b'\xef\xbb\xbf'), 'UTF-8-BOM vorhanden (Spiel braucht ihn für Umlaute)')
     # every original row still there
     orig_dom = xml.dom.minidom.parseString(hud_in)
     orig_rows = [n for n in [x for x in orig_dom.getElementsByTagName('local:CommonListBox')][0].childNodes if n.nodeType == n.ELEMENT_NODE]
-    check(len(rows) == len(orig_rows) + 7 + 5 + 5 + 22, f'Zeilen: {len(orig_rows)} Original + 17 EO + 22 neu = {len(rows)}')
+    check(len(rows) == len(orig_rows) + 7 + 5 + 5 + len(props), f'Zeilen: {len(orig_rows)} Original + 17 EO + {len(props)} neu = {len(rows)}')
     btn = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding EoRigButton1}'][0]
     check(btn.getAttribute('ItemsSource') == '{Binding FunctionChoices}', 'Tasten-Zeilen nutzen FunctionChoices')
 
@@ -156,13 +171,15 @@ def set_box(i, value, as_float):
     e.call('Fh2TestVideoSet', base + i, 0x7777, b)
     return len(changed) >= 1
 
-expect = [1, 1, 0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2, 450.0, 3.0, 180.0, 0, 2, 1, 0, 5, 0]
-got = [get(i) for i in range(19)]
-check(got == expect, f'Startwerte aus deinen INIs: {got}')
-check(get(20) == 1, f'Profil beim Start: Mein Setup erkannt ({get(20)})')
+expect = [1, 1, 0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2, 450.0, 3.0, 180.0, 0, 2, 1, 0, 0, 5, 0]
+got = [get(i) for i in range(20)]
+check(got == expect, f'Startwerte aus deinen INIs (FFB-Art Spiel neu): {got}')
+check(get(PROFILE) == 1, f'Profil beim Start: Mein Setup erkannt ({get(PROFILE)})')
+kb = [get(i) for i in range(KEY_ENABLED, KEY_PEDAL + 1)]
+check(kb == [1, 150.0, 90.0, 60.0], f'Tastatur-Startwerte (FH2_Tastatur.ini neu angelegt): {kb}')
 
 ok = set_box(2, 0.85, True); check(ok and get(2) == 0.85, 'FFB-Stärke 75% -> 85%')
-check(get(20) == 0, 'Profil springt auf Eigene Werte, sobald ein Wert geändert wird')
+check(get(PROFILE) == 0, 'Profil springt auf Eigene Werte, sobald ein Wert geändert wird')
 ok = set_box(2, 0.85, True); check(not ok, 'gleicher Wert -> keine Änderung gemeldet')
 ok = set_box(3, 1.5, True); check(ok and get(3) == 1.5, 'Vibration -> 150%')
 ok = set_box(11, 2.9999998, True); check(not ok or get(11) == 3.0, 'Kurve 2.9999998 wird zu 3.0 gerundet (keine Änderung)')
@@ -171,9 +188,13 @@ ok = set_box(10, 440.0, True); check(ok and get(10) == 440.0, 'Anschlag 450 -> 4
 ok = set_box(12, 210.0, True); check(ok and get(12) == 210.0, 'Drehwinkel 180 -> 210')
 ok = set_box(6, 40.0, True); check(ok and get(6) == 40.0, 'Glättung 35 -> 40 ms')
 ok = set_box(13, 1, False); check(ok and get(13) == 1, 'H-Schaltung aus -> an')
-ok = set_box(17, 3, False); check(ok and get(17) == 3, 'Verkehr 5 -> 3')
-ok = set_box(18, 1, False); check(ok and get(18) == 1, 'Rushhour aus -> an')
-ok = set_box(17, 6, False); check(not ok and get(17) == 3, 'Verkehr 6 (ungültig) abgelehnt')
+ok = set_box(LEVEL, 3, False); check(ok and get(LEVEL) == 3, 'Verkehr 5 -> 3')
+ok = set_box(ALLDAY, 1, False); check(ok and get(ALLDAY) == 1, 'Rushhour aus -> an')
+ok = set_box(LEVEL, 6, False); check(not ok and get(LEVEL) == 3, 'Verkehr 6 (ungültig) abgelehnt')
+ok = set_box(FFB_MODE, 1, False); check(ok and get(FFB_MODE) == 1, 'FFB-Art Spiel -> Eigenes')
+ok = set_box(FFB_MODE, 2, False); check(not ok and get(FFB_MODE) == 1, 'FFB-Art 2 (gibt es nicht) abgelehnt')
+ok = set_box(KEY_STEER, 200.0, True); check(ok and get(KEY_STEER) == 200.0, 'Tastatur-Lenkzeit 150 -> 200 ms')
+ok = set_box(KEY_PEDAL, 5000.0, True); check(not ok and get(KEY_PEDAL) == 60.0, 'Pedalzeit 5000 (zu groß) abgelehnt')
 ok = set_box(2, 2.5, True); check(not ok and get(2) == 0.85, 'FFB-Stärke 250% (außerhalb) abgelehnt')
 ok = set_box(2, float('nan'), True); check(not ok and get(2) == 0.85, 'NaN abgelehnt')
 ok = set_box(10, 20.0, True); check(not ok and get(10) == 440.0, 'Anschlag 20 (unter 30) abgelehnt')
@@ -181,9 +202,10 @@ ok = set_box(10, 20.0, True); check(not ok and get(10) == 440.0, 'Anschlag 20 (u
 # ---- live into the wheel bridge
 print('Lenkrad live')
 e.call('Fh2TestWheelLiveApply')
-cfg = {i: e.call('Fh2TestWheelConfig', i) & 0xffffffff for i in range(17)}
+cfg = {i: e.call('Fh2TestWheelConfig', i) & 0xffffffff for i in range(18)}
 check(cfg[2] == 85 and cfg[3] == 150 and cfg[11] == 31 and cfg[10] == 440 and cfg[12] == 210 and cfg[6] == 40 and cfg[13] == 1,
       f'Brücke übernimmt Werte: Stärke {cfg[2]}, Vibration {cfg[3]}, Kurve {cfg[11]}, Anschlag {cfg[10]}, Drehwinkel {cfg[12]}, Glättung {cfg[6]}, Schaltknauf {cfg[13]}')
+check(cfg[FFB_MODE] == 1, f'Brücke übernimmt FFB-Art {cfg[FFB_MODE]}')
 c_mid = e.call('Fh2TestWheelCurve', 32768 + 3277) & 0xffffffff
 ok = set_box(11, 1.0, True)
 e.call('Fh2TestWheelLiveApply')
@@ -199,16 +221,16 @@ vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
 check(vals == [48.0, 48.0, 26.0, 18.0, 5.0, 16], f'Stufe 3 im Spielspeicher: {vals}')
 times = [tunable(rva) for rva, _, _ in TIMES]
 check(times == [0.5, 23.5, 23.5, 0.5], f'Rushhour ganztägig: {times}')
-set_box(18, 0, False); e.call('Fh2TestTrafficApply')
+set_box(ALLDAY, 0, False); e.call('Fh2TestTrafficApply')
 times = [tunable(rva) for rva, _, _ in TIMES]
 check(times == [7.0, 19.0, 23.0, 5.0], f'Rushhour aus -> Originalzeiten zurück: {times}')
-set_box(17, 0, False); e.call('Fh2TestTrafficApply')
+set_box(LEVEL, 0, False); e.call('Fh2TestTrafficApply')
 vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
 check(vals == [14.0, 16.0, 10.0, 7.0, 8.0, 5], f'Stufe 0 -> Originalwerte zurück: {vals}')
-set_box(17, 5, False); e.call('Fh2TestTrafficApply')
+set_box(LEVEL, 5, False); e.call('Fh2TestTrafficApply')
 vals = [tunable(rva, vt) for rva, vt, _, _ in TUNABLES]
 check(vals == [100.0, 100.0, 50.0, 40.0, 3.0, 30], f'Stufe 5 wieder: {vals}')
-set_box(17, 3, False)
+set_box(LEVEL, 3, False)
 
 # ---- saving
 print('Speichern')
@@ -227,7 +249,9 @@ print('   FH2_Lenkrad.ini:', dw)
 print('   FH2_ExtraOptions.ini:', de)
 check(sorted(dw) == sorted(['-Drehwinkel=180', '+Drehwinkel=210', '-Schaltknauf=0', '+Schaltknauf=1', '-Anschlag=450', '+Anschlag=440',
                            '-FFBStaerke=75', '+FFBStaerke=85', '-Vibration=50', '+Vibration=150', '-Glaettung=35', '+Glaettung=40',
-                           '-Kurve=30', '+Kurve=31']), 'Lenkrad-INI: nur die geänderten Zeilen')
+                           '-Kurve=30', '+Kurve=31', '+FFBModus=1']), 'Lenkrad-INI: nur die geänderten Zeilen (+ neue Schlüssel)')
+kbini = open(os.path.join(root, 'FH2_Tastatur.ini'), 'rb').read()
+check(b'Lenkzeit=200' in kbini and b'Maus=' not in kbini and b'Gas=W' in kbini, 'Tastatur-INI: Werte gespeichert, Belegung erhalten')
 check(sorted(de) == sorted(['-TrafficLevel=5', '+TrafficLevel=3']), 'Extra-Options-INI: nur TrafficLevel (Rushhour wieder 0 = unverändert)')
 check(len(eo) <= 8192, f'Extra-Options-INI bleibt unter 8192 Bytes ({len(eo)})')
 check(not any(n.endswith('.eotmp') for n in os.listdir(root)), 'keine Temp-Dateien übrig')
@@ -247,18 +271,18 @@ eo_text = open(pe, 'rb').read().replace(b'RushHourAllDay=0', b'RushHourAllDay=1'
 open(pe, 'wb').write(eo_text); e.touch(pe)
 e.tick += 1500
 e.call('Fh2TestRigStep', e.tick)
-check(get(13) == 0 and get(2) == 0.6 and get(18) == 1, f'neue Werte übernommen: H-Schaltung {get(13)}, Stärke {get(2)}, Rushhour {get(18)}')
+check(get(13) == 0 and get(2) == 0.6 and get(ALLDAY) == 1, f'neue Werte übernommen: H-Schaltung {get(13)}, Stärke {get(2)}, Rushhour {get(ALLDAY)}')
 check(open(p, 'rb').read() == text, 'dabei nichts zurückgeschrieben')
 
 # ---- profiles
 print('FFB-Profile')
-ok = set_box(20, 3, False)
+ok = set_box(PROFILE, 3, False)
 vals = [get(i) for i in (2, 3, 4, 5, 6, 7, 8, 9)]
-check(ok and vals == [0.9, 0.4, 0.04, 0.03, 20.0, 0.03, 0.4, 0.2] and get(20) == 3, f'Profil Direkt setzt alle 8 Werte: {vals}')
-ok = set_box(20, 0, False); check(not ok and get(2) == 0.9, 'Eigene Werte wählen ändert nichts')
-ok = set_box(20, 1, False)
-check(ok and [get(i) for i in (2, 3, 4, 5, 6, 7, 8, 9)] == [0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2] and get(20) == 1, 'Mein Setup stellt deine Werte wieder her')
-ok = set_box(20, 6, False); check(not ok, 'Profil 6 (gibt es nicht) abgelehnt')
+check(ok and vals == [0.9, 0.4, 0.04, 0.03, 20.0, 0.03, 0.4, 0.2] and get(PROFILE) == 3, f'Profil Direkt setzt alle 8 Werte: {vals}')
+ok = set_box(PROFILE, 0, False); check(not ok and get(2) == 0.9, 'Eigene Werte wählen ändert nichts')
+ok = set_box(PROFILE, 1, False)
+check(ok and [get(i) for i in (2, 3, 4, 5, 6, 7, 8, 9)] == [0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2] and get(PROFILE) == 1, 'Mein Setup stellt deine Werte wieder her')
+ok = set_box(PROFILE, 6, False); check(not ok, 'Profil 6 (gibt es nicht) abgelehnt')
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 w2 = open(p, 'rb').read()
@@ -267,16 +291,16 @@ check(b'FFBStaerke=75' in w2 and b'Glaettung=35' in w2, 'Profilwerte gespeichert
 
 # ---- Verkehrs-Voreinstellung
 print('Verkehrs-Voreinstellung')
-ok = set_box(21, 5, False)
-check(ok and get(17) == 5 and get(18) == 1 and get(21) == 5, f'Chaos: Menge 5 + Rushhour an: {get(17)}, {get(18)}, {get(21)}')
-ok = set_box(21, 2, False)
-check(ok and get(17) == 1 and get(18) == 0 and get(21) == 2, f'Ruhig: Menge 1, Rushhour aus: {get(17)}, {get(18)}, {get(21)}')
-ok = set_box(21, 0, False); check(not ok and get(17) == 1, 'Eigene Werte wählen ändert nichts')
-ok = set_box(17, 2, False)
-check(ok and get(21) == 0, 'Menge von Hand geändert: Voreinstellung zeigt Eigene Werte')
-ok = set_box(21, 6, False); check(not ok, 'Voreinstellung 6 (gibt es nicht) abgelehnt')
-ok = set_box(21, 1, False)
-check(ok and get(17) == 0 and get(18) == 0 and get(21) == 1, 'Original: Menge 0, Rushhour aus')
+ok = set_box(PRESET, 5, False)
+check(ok and get(LEVEL) == 5 and get(ALLDAY) == 1 and get(PRESET) == 5, f'Chaos: Menge 5 + Rushhour an: {get(LEVEL)}, {get(ALLDAY)}, {get(PRESET)}')
+ok = set_box(PRESET, 2, False)
+check(ok and get(LEVEL) == 1 and get(ALLDAY) == 0 and get(PRESET) == 2, f'Ruhig: Menge 1, Rushhour aus: {get(LEVEL)}, {get(ALLDAY)}, {get(PRESET)}')
+ok = set_box(PRESET, 0, False); check(not ok and get(LEVEL) == 1, 'Eigene Werte wählen ändert nichts')
+ok = set_box(LEVEL, 2, False)
+check(ok and get(PRESET) == 0, 'Menge von Hand geändert: Voreinstellung zeigt Eigene Werte')
+ok = set_box(PRESET, 6, False); check(not ok, 'Voreinstellung 6 (gibt es nicht) abgelehnt')
+ok = set_box(PRESET, 1, False)
+check(ok and get(LEVEL) == 0 and get(ALLDAY) == 0 and get(PRESET) == 1, 'Original: Menge 0, Rushhour aus')
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 pe_now = open(pe, 'rb').read()
@@ -285,17 +309,17 @@ check(b'TrafficLevel=0' in pe_now, 'Menge aus der Voreinstellung gespeichert')
 
 # ---- Wetter
 print('Wetter')
-check(get(19) == 0, f'Wetter beim Start: Original ({get(19)})')
-ok = set_box(19, 4, False)
-check(ok and get(19) == 4, f'Wetter Regen gewählt: {get(19)}')
-ok = set_box(19, 6, False); check(not ok and get(19) == 4, 'Wetter 6 (gibt es nicht) abgelehnt')
+check(get(WEATHER) == 0, f'Wetter beim Start: Original ({get(WEATHER)})')
+ok = set_box(WEATHER, 4, False)
+check(ok and get(WEATHER) == 4, f'Wetter Regen gewählt: {get(WEATHER)}')
+ok = set_box(WEATHER, 6, False); check(not ok and get(WEATHER) == 4, 'Wetter 6 (gibt es nicht) abgelehnt')
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 pe_now = open(pe, 'rb').read()
 check(b'Wetter=4' in pe_now, 'Wetter in FH2_ExtraOptions.ini gespeichert ([Traffic] Wetter=4)')
 r = e.call('Fh2TestReadOptions', directory, e.alloc(400))
 check(r == 1, 'Extra Options akzeptiert die INI mit Wetter-Zeile')
-ok = set_box(19, 0, False)
+ok = set_box(WEATHER, 0, False)
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 check(ok and b'Wetter=0' in open(pe, 'rb').read(), 'Wetter zurück auf Original gespeichert')
@@ -305,7 +329,8 @@ check(e.call('Fh2TestWeatherManager') == 0, 'ohne Spielwelt: kein WeatherManager
 print('Englisch')
 set_language('EN')
 _, hud_en = extend(HUD)
-check(b'Wheel: Force Feedback Strength' in hud_en and b'Traffic: Amount' in hud_en, 'englische Texte bei englischem Spiel')
+check(b'Wheel: Force Feedback Strength' in hud_en and b'Traffic: Amount' in hud_en and b'Keyboard: Keyboard' in hud_en and b'Mouse' not in hud_en and b'Wheel: RSB Button' in hud_en and b'H-Pattern' not in hud_en and b'Cockpit Wheel' not in hud_en, 'englische Texte bei englischem Spiel')
+check('Nebel nur auf der Sturm-Insel, sonst sonnig'.encode() in hud and 'Neustart von Azimuth'.encode() in hud, 'korrigierte Texte: Nebel sonst sonnig, Verkehr braucht Azimuth-Neustart')
 xml.dom.minidom.parseString(hud_en)
 print()
 print('FEHLER:' if fails else 'ALLE TESTS OK', len(fails) or '')

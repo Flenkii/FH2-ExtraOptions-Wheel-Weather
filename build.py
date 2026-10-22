@@ -61,6 +61,8 @@ COMMON_SOURCES = [
     "features/rig_settings.c",
     "features/wheel_buttons.c",
     "features/weather.c",
+    "features/ffb_vm.c",
+    "features/keyboard_pad.c",
 ]
 
 
