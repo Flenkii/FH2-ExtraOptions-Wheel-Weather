@@ -1,7 +1,8 @@
-FH2 Extra Options – unofficial fork (wheel, keyboard, traffic, weather)
-=======================================================================
+GRIPLINE V4 – wheel, keyboard, traffic & weather for Forza Horizon 2 (Azimuth)
+=============================================================================
+Based on Extra Options 0.2.98 by RokkuDayo.
 
-Source code: https://github.com/Flenkii/FH2-ExtraOptions-Wheel-Weather
+Source code: https://github.com/Flenkii/Gripline
 Original:    https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions (GPL-3.0)
 
 No game files and no Azimuth included. Never paste commands into PowerShell to install
@@ -61,7 +62,7 @@ into your Azimuth folder (replaces your FH2_Wheel.ini and FH2_Keyboard.ini):
 
 
 PROBLEMS? Please report them on GitHub Issues:
-  https://github.com/Flenkii/FH2-ExtraOptions-Wheel-Weather/issues
+  https://github.com/Flenkii/Gripline/issues
 Attach these files from your Azimuth folder (next to azimuth.exe):
   - FH2_ExtraOptions.log                    (always)
   - FH2_Wheel.log                           (wheel problems)

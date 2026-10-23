@@ -1,8 +1,12 @@
-# Forza Horizon 2 – Extra Options + Wheel, Keyboard, Traffic & Weather (unofficial fork)
+# Gripline
 
-This is an **unofficial fork** of [RokkuDayo/ForzaHorizon2_ExtraOptions](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions)
-(version 0.2.98) for the Xbox One version of Forza Horizon 2 running on the **Azimuth** wrapper.
-All features of the original are included unchanged – see [README_ORIGINAL.md](README_ORIGINAL.md). This fork adds:
+**Wheel, keyboard, traffic & weather for Forza Horizon 2 on PC** (Xbox One version running on the **Azimuth** wrapper).
+Works offline and online with [FH2MP](https://github.com/Charelene/FH2MP).
+
+**[⬇ Download the latest version](../../releases/latest)** · current version: **V4**
+
+Gripline is built on [Extra Options 0.2.98](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions) by RokkuDayo (GPL-3.0):
+all features of Extra Options are included unchanged – see [README_ORIGINAL.md](README_ORIGINAL.md). Gripline adds:
 
 | Feature | In short |
 |---|---|
@@ -10,7 +14,7 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 | **Force feedback** | The **game's own wheel force feedback** – FH2's original Xbox wheel programs run on the PC, exactly like on the Xbox. No custom FFB profiles; only strength and rumble can be scaled. |
 | **Keyboard** | Drive with WASD, arrow keys move the camera while driving and scroll in menus, Enter/Backspace/Esc in menus, FH5-like bindings. Works together with a controller (one merged pad, no "player 2" problems). Bindings in `FH2_Keyboard.ini`. While a wheel is connected, the game drives with the wheel. |
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
-| **In-game "Wheel & Traffic" page** | Options › HUD › bottom. All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
+| **In-game settings page** | Options › HUD › bottom. All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
 | **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog (fog only on Storm Island, sunny elsewhere) – through the game's own weather control, no game files changed. |
 | **Tools** (`tools/`) | Python scripts for the cockpit wheel, More Traffic files and "traffic variety" (20 extra traffic car models). Not part of the release download. |
