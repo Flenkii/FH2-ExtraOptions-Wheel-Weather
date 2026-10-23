@@ -67,6 +67,7 @@ static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
                      NULL},
     [RIG_WHEEL_FFB_MODE] = {"EoRigFfbMode", "FFBMode", 0, RIG_FFB_MODE_COUNT - 1, RIG_KIND_FFB_MODE,
                             0, 1, NULL},
+    [RIG_WHEEL_CLUTCH_BRAKE] = {"EoRigClutchBrake", "ClutchAsBrake", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
     [RIG_KEY_ENABLED] = {"EoKeyEnabled", "Enabled", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
     [RIG_KEY_STEER] = {"EoKeySteer", "SteerTime", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
     [RIG_KEY_RETURN] = {"EoKeyReturn", "ReturnTime", 0, 1000, RIG_KIND_NUMBER, 0, 1,
@@ -82,7 +83,7 @@ static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
    uses it (FH2 only knows shift up / shift down). */
 static const unsigned char order[] = {
     RIG_WHEEL_ENABLED,   RIG_WHEEL_FFB,     RIG_WHEEL_STRENGTH, RIG_WHEEL_RUMBLE,
-    RIG_WHEEL_ROTATION,  RIG_WHEEL_BUTTON1, RIG_WHEEL_BUTTON2,  RIG_WHEEL_BUTTON3,
+    RIG_WHEEL_ROTATION,  RIG_WHEEL_CLUTCH_BRAKE, RIG_WHEEL_BUTTON1, RIG_WHEEL_BUTTON2,  RIG_WHEEL_BUTTON3,
     RIG_KEY_ENABLED,     RIG_KEY_STEER,     RIG_KEY_RETURN,     RIG_KEY_PEDAL,
     RIG_TRAFFIC_PRESET,  RIG_TRAFFIC_LEVEL, RIG_TRAFFIC_ALL_DAY, RIG_WEATHER,
 };
@@ -255,6 +256,9 @@ static const RigText german[RIG_SETTING_COUNT] = {
                             "Xbox: Rückstellkraft, Lenkgewicht, Dämpfung, Vibration und die "
                             "Zentrierung in Menüs berechnet das Spiel. Eigenes = das alte FFB der "
                             "Mod. Wirkt sofort."},
+    [RIG_WHEEL_CLUTCH_BRAKE] = {"Lenkrad: Kupplung als Bremse",
+                                "Das Kupplungspedal bremst, die Kupplung ist dann aus. Praktisch, weil "
+                                "das Bremspedal des G920 sehr hart ist. Idee: Lancaster. Wirkt sofort."},
     [RIG_KEY_ENABLED] = {"Tastatur: Tastatur",
                          "Die Tastatur steuert das Spiel wie ein Gamepad: W/S Gas und Bremse, A/D "
                          "lenken, Leertaste Handbremse, E/Q schalten, Pfeiltasten = Kamera beim "
@@ -353,6 +357,9 @@ static const RigText english[RIG_SETTING_COUNT] = {
                             "aligning torque, steering weight, damping, rumble and the centring in "
                             "menus come from the game. Own = the mod's old force feedback. Applies "
                             "immediately."},
+    [RIG_WHEEL_CLUTCH_BRAKE] = {"Wheel: Clutch Pedal as Brake",
+                                "The clutch pedal brakes, the clutch is off then. Handy because the "
+                                "G920 brake pedal is very stiff. Idea: Lancaster. Applies immediately."},
     [RIG_KEY_ENABLED] = {"Keyboard: Keyboard",
                          "The keyboard controls the game like a gamepad: W/S throttle and brake, "
                          "A/D steer, Space handbrake, E/Q shift, arrow keys = camera while driving "

@@ -273,6 +273,7 @@ typedef struct {
     int smoothing, friction, minforce;
     int ffb_mode; /* 0 = the game's own wheel programs (like on the Xbox), 1 = own FFB (old) */
     int wheel_dll; /* 1 = use Microsoft.Xbox.Input.Wheel.dll if it exists, 0 = always our own */
+    int clutch_brake; /* 1 = the clutch pedal brakes, the clutch is off */
     int extra_button[WHEEL_EXTRA_BUTTONS], extra_function[WHEEL_EXTRA_BUTTONS];
     wchar_t device[128];
 } WheelConfig;
@@ -335,11 +336,13 @@ static const char default_ini[] =
     "InvertSteering=0\r\n"
     "; Axes: X Y Z Rx Ry Rz Slider0 Slider1 or - (none). G920: steering X, throttle Y,\r\n"
     "; brake Rz, clutch Slider0.\r\n"
-    "; Clutch pedal as brake (the G920 brake pedal is stiff): BrakeAxis=Slider0 and ClutchAxis=-\r\n"
     "SteeringAxis=X\r\n"
     "ThrottleAxis=Y\r\n"
     "BrakeAxis=Rz\r\n"
     "ClutchAxis=Slider0\r\n"
+    "; Clutch pedal as brake (the G920 brake pedal is stiff): 1 = the clutch pedal brakes and\r\n"
+    "; the clutch is off, 0 = standard. Also in the game: Options > HUD > bottom.\r\n"
+    "ClutchAsBrake=0\r\n"
     "; Button numbers (0 = first button). The log shows the numbers of pressed buttons.\r\n"
     "ButtonA=0\r\n"
     "ButtonB=1\r\n"
@@ -433,6 +436,7 @@ static void config_load(void) {
     cfg.ffb_mode = read_int(L"FFBMode", 0) == 1 ? 1 : 0;
     cfg.log = read_int(L"Log", 1);
     cfg.wheel_dll = read_int(L"WheelDll", 1);
+    cfg.clutch_brake = read_int(L"ClutchAsBrake", 0) == 1;
     /* free wheel buttons: G920 RSB = 8, LSB = 9, Xbox button = 10 (DirectInput numbers) */
     static const wchar_t *const extra_keys[WHEEL_EXTRA_BUTTONS] = {L"ExtraButton1", L"ExtraButton2",
                                                                    L"ExtraButton3"};
@@ -481,6 +485,7 @@ static int *cfg_field(unsigned id) {
         case RIG_WHEEL_BUTTON2: return &cfg.extra_function[1];
         case RIG_WHEEL_BUTTON3: return &cfg.extra_function[2];
         case RIG_WHEEL_FFB_MODE: return &cfg.ffb_mode;
+        case RIG_WHEEL_CLUTCH_BRAKE: return &cfg.clutch_brake;
     }
     return NULL;
 }
@@ -1494,6 +1499,14 @@ static unsigned apply_curve(unsigned raw) {
     return (unsigned)r;
 }
 
+/* pedal axes, with "clutch pedal as brake" applied */
+static int brake_axis(void) {
+    return cfg.clutch_brake && cfg.axis_clutch >= 0 ? cfg.axis_clutch : cfg.axis_brake;
+}
+static int clutch_axis(void) {
+    return cfg.clutch_brake ? -1 : cfg.axis_clutch;
+}
+
 static void build_report(const JoyState *s, unsigned char *packet) {
     zero(packet, 0x14 + 0x11);
     *(uint64_t *)packet = WHEEL_ID;
@@ -1528,8 +1541,8 @@ static void build_report(const JoyState *s, unsigned char *packet) {
     steer = apply_curve(steer);
     *(uint16_t *)(p + 2) = (uint16_t)steer;
     *(uint16_t *)(p + 4) = (uint16_t)pedal(s, cfg.axis_throttle);
-    *(uint16_t *)(p + 6) = (uint16_t)pedal(s, cfg.axis_brake);
-    *(uint16_t *)(p + 8) = (uint16_t)pedal(s, cfg.axis_clutch);
+    *(uint16_t *)(p + 6) = (uint16_t)pedal(s, brake_axis());
+    *(uint16_t *)(p + 8) = (uint16_t)pedal(s, clutch_axis());
     p[0xa] = 0;
     p[0xb] = 0;
     unsigned char gear = 0;
@@ -1542,7 +1555,7 @@ static void build_report(const JoyState *s, unsigned char *packet) {
     p[0xc] = gear;
     *(uint16_t *)(p + 0xd) = (uint16_t)cfg.rotation;
     p[0xf] = 0;
-    p[0x10] = (unsigned char)(0x80 | 0x40 | (cfg.axis_clutch >= 0 ? 0x20 : 0));
+    p[0x10] = (unsigned char)(0x80 | 0x40 | (clutch_axis() >= 0 ? 0x20 : 0));
 }
 
 static void send_static_config(void) {
@@ -1555,7 +1568,7 @@ static void send_static_config(void) {
     p[0] = 16;                              /* wheel bits */
     p[1] = 10;                              /* throttle bits */
     p[2] = 10;                              /* brake bits */
-    p[3] = cfg.axis_clutch >= 0 ? 10 : 0;   /* clutch bits (0 = none) */
+    p[3] = clutch_axis() >= 0 ? 10 : 0;     /* clutch bits (0 = none) */
     p[4] = 0;                               /* handbrake bits (none) */
     *(uint16_t *)(p + 5) = (uint16_t)cfg.rotation; /* min rotation */
     *(uint16_t *)(p + 7) = (uint16_t)cfg.rotation; /* max rotation */
@@ -2075,7 +2088,7 @@ static void csv_write(const JoyState *s, ULONGLONG now) {
     fmt_put(&o, end, ';');
     csv_put(&o, end, (long long)pedal(s, cfg.axis_throttle));
     fmt_put(&o, end, ';');
-    csv_put(&o, end, (long long)pedal(s, cfg.axis_brake));
+    csv_put(&o, end, (long long)pedal(s, brake_axis()));
     fmt_put(&o, end, ';');
     csv_put(&o, end, ffb_updates);
     for (int i = 0; i < 32; ++i) {
@@ -2106,7 +2119,7 @@ static void live_apply(void) {
     LONG generation = live_generation;
     if (generation == applied_generation) return;
     applied_generation = generation;
-    int old_ffb = cfg.ffb, old_rotation = cfg.rotation, old_curve = cfg.curve10;
+    int old_ffb = cfg.ffb, old_rotation = cfg.rotation, old_curve = cfg.curve10, old_clutch = cfg.clutch_brake;
     for (unsigned id = 0; id < RIG_WHEEL_COUNT; ++id) {
         int *field = cfg_field(id);
         if (field && id != RIG_WHEEL_ENABLED) *field = (int)live_values[id];
@@ -2120,8 +2133,8 @@ static void live_apply(void) {
         pe.dwPeriod = 47000;
         fx_rumble_b = make_effect(&G_Sine, &pe, sizeof(pe));
     }
-    /* the game learns the rotation from the static configuration report as well */
-    if (cfg.rotation != old_rotation && input_handler) {
+    /* the game learns the rotation and whether there is a clutch from the static configuration */
+    if ((cfg.rotation != old_rotation || cfg.clutch_brake != old_clutch) && input_handler) {
         __try {
             send_static_config();
         } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -2135,11 +2148,11 @@ static void live_apply(void) {
 static void live_log(ULONGLONG now) {
     if (!live_log_at || now < live_log_at) return;
     live_log_at = 0;
-    wlog("Ingame-Menue: FFB=%d FFBModus=%d Staerke=%d Vibration=%d Daempfung=%d Reibung=%d Glaettung=%d "
-         "Mindestkraft=%d KraftNachAussen=%d Zentrierung=%d Anschlag=%d Kurve=%d Drehwinkel=%d "
-         "Schaltknauf=%d",
+    wlog("Ingame-Menue: ForceFeedback=%d FFBMode=%d FFBStrength=%d Rumble=%d Damping=%d Friction=%d Smoothing=%d "
+         "MinimumForce=%d OutwardForce=%d Centering=%d Lock=%d Curve=%d Rotation=%d Shifter=%d ClutchAsBrake=%d",
          cfg.ffb, cfg.ffb_mode, cfg.strength, cfg.rumble, cfg.damping, cfg.friction, cfg.smoothing,
-         cfg.minforce, cfg.outward, cfg.centering, cfg.lock, cfg.curve10, cfg.rotation, cfg.shifter);
+         cfg.minforce, cfg.outward, cfg.centering, cfg.lock, cfg.curve10, cfg.rotation, cfg.shifter,
+         cfg.clutch_brake);
 }
 
 /* ------------------------------------------------------------------ reconnect (cable pulled / USB hiccup) */
@@ -2674,6 +2687,18 @@ __declspec(dllexport) unsigned Fh2TestWheelReport(unsigned buttons) {
     unsigned char packet[0x14 + 0x11];
     build_report(&s, packet);
     return packet[0x14] | (unsigned)packet[0x15] << 8;
+}
+/* report pedals for raw brake / clutch axis values: brake << 16 | clutch, static config clutch bits << 32 */
+__declspec(dllexport) unsigned long long Fh2TestWheelPedals(unsigned brake, unsigned clutch) {
+    JoyState s;
+    zero(&s, sizeof(s));
+    s.pov = 0xffffffff;
+    if (cfg.axis_brake >= 0) s.axis[cfg.axis_brake] = (LONG)brake;
+    if (cfg.axis_clutch >= 0) s.axis[cfg.axis_clutch] = (LONG)clutch;
+    unsigned char packet[0x14 + 0x11];
+    build_report(&s, packet);
+    unsigned b = packet[0x14 + 6] | (unsigned)packet[0x14 + 7] << 8, c = packet[0x14 + 8] | (unsigned)packet[0x14 + 9] << 8;
+    return (unsigned long long)(clutch_axis() >= 0 ? 10 : 0) << 32 | b << 16 | c;
 }
 __declspec(dllexport) void Fh2TestWheelLiveApply(void) {
     live_apply();

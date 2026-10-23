@@ -51,6 +51,7 @@ PROFILES = {
     'Controller': ({'Enabled': 0}, {'Enabled': 0}),
     'Keyboard': ({'Enabled': 0}, {'Enabled': 1}),
     'Wheel': ({'Enabled': 1}, {'Enabled': 1}),
+    'Wheel_ClutchAsBrake': ({'Enabled': 1, 'ClutchAsBrake': 1}, {'Enabled': 1}),
 }
 
 

@@ -9,9 +9,9 @@ HUD = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_HUDOptions.xaml')
 VIDEO = os.path.join(GAME_DIR, 'ui/Scenes/Anthem/A_VideoOptions.xaml')
 fails = []
 # setting ids (rig_settings.h)
-FFB_MODE, LEVEL, ALLDAY, WEATHER = 17, 18, 19, 20
-KEY_ENABLED, KEY_STEER, KEY_RETURN, KEY_PEDAL = 21, 22, 23, 24
-PROFILE, PRESET = 25, 26
+FFB_MODE, CLUTCH_BRAKE, LEVEL, ALLDAY, WEATHER = 17, 18, 19, 20, 21
+KEY_ENABLED, KEY_STEER, KEY_RETURN, KEY_PEDAL = 22, 23, 24, 25
+PROFILE, PRESET = 26, 27
 
 def check(cond, text):
     print(('  ok   ' if cond else '  FAIL ') + text)
@@ -115,7 +115,7 @@ except Exception as ex:
     check(False, f'HUD-XAML wohlgeformt: {ex}')
 open(os.path.join(tempfile.gettempdir(), 'hud_de.xaml'), 'wb').write(hud)
 props = ['EoRigWheelEnabled', 'EoRigForceFeedback', 'EoRigStrength', 'EoRigRumble', 'EoRigRotation',
-         'EoRigButton1', 'EoRigButton2', 'EoRigButton3', 'EoKeyEnabled', 'EoKeySteer',
+         'EoRigClutchBrake', 'EoRigButton1', 'EoRigButton2', 'EoRigButton3', 'EoKeyEnabled', 'EoKeySteer',
          'EoKeyReturn', 'EoKeyPedal', 'EoRigDensity',
          'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather']
 hidden = ['EoRigFfbMode', 'EoRigProfile', 'EoRigDamping', 'EoRigFriction', 'EoRigSmoothing', 'EoRigMinimumForce',
@@ -144,11 +144,12 @@ if dom:
     check(used <= keys, f'alle EO-Ressourcen definiert ({len(used)} benutzt): fehlend {sorted(used - keys)}')
     headings = [n.getAttribute('Heading') for n in dom.getElementsByTagName('local:TileMenuDataItem')
                 if n.getAttribute('x:Key')[3:] in props]
-    want = {2: 'Lenkrad: FFB-Stärke', 4: 'Lenkrad: Drehwinkel (Grad)', 5: 'Lenkrad: Taste RSB',
-            8: 'Tastatur: Tastatur', 11: 'Tastatur: Pedalzeit (ms)', 12: 'Verkehr: Voreinstellung',
-            13: 'Verkehr: Menge', 15: 'Wetter'}
+    want = {2: 'Lenkrad: FFB-Stärke', 4: 'Lenkrad: Drehwinkel (Grad)', 5: 'Lenkrad: Kupplung als Bremse',
+            6: 'Lenkrad: Taste RSB', 9: 'Tastatur: Tastatur', 12: 'Tastatur: Pedalzeit (ms)',
+            13: 'Verkehr: Voreinstellung', 14: 'Verkehr: Menge', 16: 'Wetter'}
     check(all(headings[i] == t for i, t in want.items()), 'deutsche Texte: ' + ', '.join(repr(headings[i]) for i in want))
-    for name, coll in (('EoRigButton1', 'FunctionChoices'), ('EoKeyEnabled', 'ToggleChoices')):
+    for name, coll in (('EoRigButton1', 'FunctionChoices'), ('EoKeyEnabled', 'ToggleChoices'),
+                       ('EoRigClutchBrake', 'ToggleChoices')):
         row = [r for r in rows if r.getAttribute('SelectedIndex') == '{Binding %s}' % name][0]
         check(row.getAttribute('ItemsSource') == '{Binding %s}' % coll, f'{name} nutzt {coll}')
     for name, style in (('EoKeySteer', 'EO_KeyTime'), ('EoKeyPedal', 'EO_KeyTime')):
@@ -187,8 +188,8 @@ def set_box(i, value, as_float):
     e.call('Fh2TestVideoSet', base + i, 0x7777, b)
     return len(changed) >= 1
 
-expect = [1, 1, 0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2, 450.0, 3.0, 180.0, 0, 2, 1, 0, 0, 5, 0]
-got = [get(i) for i in range(20)]
+expect = [1, 1, 0.75, 0.5, 0.06, 0.04, 35.0, 0.02, 0.3, 0.2, 450.0, 3.0, 180.0, 0, 2, 1, 0, 0, 0, 5, 0]
+got = [get(i) for i in range(21)]
 check(got == expect, f'Startwerte aus deinen INIs (FFB-Art Spiel neu): {got}')
 check(get(PROFILE) == 1, f'Profil beim Start: Mein Setup erkannt ({get(PROFILE)})')
 kb = [get(i) for i in range(KEY_ENABLED, KEY_PEDAL + 1)]
@@ -230,6 +231,22 @@ check(c_lin == 32768 + 3277 and c_mid > c_lin + 2000, f'Lenkkurve wird neu berec
 set_box(11, 3.1, True)
 e.call('Fh2TestWheelLiveApply')
 
+# ---- clutch pedal as brake (idea: Lancaster)
+print('Kupplung als Bremse')
+pedals = lambda: e.call('Fh2TestWheelPedals', 65535, 32768)
+v = pedals()
+check((v >> 16) & 0xffff == 1023 and v & 0xffff in (511, 512) and v >> 32 == 10, f'Standard: Bremse voll, Kupplung halb, Kupplung vorhanden ({v:#x})')
+ok = set_box(CLUTCH_BRAKE, 1, False); check(ok and get(CLUTCH_BRAKE) == 1, 'Kupplung als Bremse: an')
+e.call('Fh2TestWheelLiveApply')
+v = pedals()
+check((v >> 16) & 0xffff in (511, 512) and v & 0xffff == 0 and v >> 32 == 0, f'an: das Kupplungspedal bremst, keine Kupplung mehr ({v:#x})')
+ok = set_box(CLUTCH_BRAKE, 2, False); check(not ok and get(CLUTCH_BRAKE) == 1, 'Wert 2 abgelehnt')
+set_box(CLUTCH_BRAKE, 0, False)
+e.call('Fh2TestWheelLiveApply')
+check((pedals() >> 16) & 0xffff == 1023, 'aus: wieder Standard')
+set_box(CLUTCH_BRAKE, 1, False)
+e.call('Fh2TestWheelLiveApply')
+
 # ---- traffic live
 print('Verkehr live')
 r = e.call('Fh2TestTrafficApply')
@@ -265,7 +282,7 @@ print('   FH2_Wheel.ini:', dw)
 print('   FH2_ExtraOptions.ini:', de)
 check(sorted(dw) == sorted(['-Rotation=180', '+Rotation=210', '-Shifter=0', '+Shifter=1', '-Lock=450', '+Lock=440',
                            '-FFBStrength=75', '+FFBStrength=85', '-Rumble=50', '+Rumble=150', '-Smoothing=35', '+Smoothing=40',
-                           '-Curve=30', '+Curve=31', '+FFBMode=1']), 'Lenkrad-INI: nur die geänderten Zeilen (+ neue Schlüssel)')
+                           '-Curve=30', '+Curve=31', '+FFBMode=1', '-ClutchAsBrake=0', '+ClutchAsBrake=1']), 'Lenkrad-INI: nur die geänderten Zeilen (+ neue Schlüssel)')
 kbini = open(os.path.join(root, 'FH2_Keyboard.ini'), 'rb').read()
 check(b'SteerTime=200' in kbini and b'Mouse=' not in kbini and b'Throttle=W' in kbini, 'Tastatur-INI: Werte gespeichert, Belegung erhalten')
 check(sorted(de) == sorted(['-TrafficLevel=5', '+TrafficLevel=3']), 'Extra-Options-INI: nur TrafficLevel (Rushhour wieder 0 = unverändert)')

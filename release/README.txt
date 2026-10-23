@@ -31,8 +31,9 @@ Without any further steps everything is automatic:
   - While a wheel is plugged in, the game drives with the wheel only. To drive with keyboard
     or controller anyway: set "Wheel: Use Wheel In Game" to Off in the game and restart
     (or unplug the wheel).
-  - G920 brake pedal too stiff? Use the clutch pedal as brake: in FH2_Wheel.ini set
-    BrakeAxis=Slider0 and ClutchAxis=- and restart the game.
+  - G920 brake pedal too stiff? Use the clutch pedal as brake: in the game
+    "Wheel: Clutch Pedal as Brake" = On (or ClutchAsBrake=1 in FH2_Wheel.ini).
+    Idea: Lancaster.
 
 
 2. OPTIONAL: READY-MADE PROFILES  (folder Optional\Profiles)
@@ -43,6 +44,7 @@ into your Azimuth folder (replaces your FH2_Wheel.ini and FH2_Keyboard.ini):
   Controller   – controller only: wheel and keyboard off
   Keyboard     – keyboard (+ controller), wheel off
   Wheel        – wheel with the game's original force feedback, keyboard stays on (default)
+  Wheel_ClutchAsBrake – like Wheel, but the clutch pedal brakes (stiff G920 brake pedal)
 
 
 PROBLEMS? Please report them on GitHub Issues:
@@ -64,7 +66,8 @@ Die Dateien aus "Azimuth" neben azimuth.exe kopieren (vorher die alte winmm.dll 
 Einstellungen: im Spiel unter Optionen > HUD > ganz unten, oder FH2_Wheel.ini /
 FH2_Keyboard.ini. Alte FH2_Lenkrad.ini/FH2_Tastatur.ini werden automatisch übernommen
 (Originale im Ordner FH2_Settings_Backup). Die Tastatur funktioniert sofort, Belegung siehe
-Keybindings.txt. Kupplung als Bremse: in FH2_Wheel.ini BrakeAxis=Slider0 und ClutchAxis=-.
+Keybindings.txt. Kupplung als Bremse: im Spiel "Lenkrad: Kupplung als Bremse" auf An
+(oder ClutchAsBrake=1 in FH2_Wheel.ini, oder Profil Wheel_ClutchAsBrake). Idee: Lancaster.
 Das Lenkrad nutzt das originale Force Feedback des Spiels. Ist ein Lenkrad eingesteckt,
 fährt das Spiel nur damit; zum Fahren mit Tastatur/Controller "Lenkrad: Lenkrad im Spiel"
 auf Aus stellen und neu starten. Optional\Profiles: fertige INI-Paare (nur Controller /

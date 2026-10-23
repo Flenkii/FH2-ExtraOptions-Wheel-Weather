@@ -6,7 +6,7 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 
 | Feature | In short |
 |---|---|
-| **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, paddles, buttons. Also works on game copies without `Microsoft.Xbox.Input.Wheel.dll` (the mod brings its own version). |
+| **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, paddles, buttons. Optional: clutch pedal as brake. Also works on game copies without `Microsoft.Xbox.Input.Wheel.dll` (the mod brings its own version). |
 | **Force feedback** | The **game's own wheel force feedback** – FH2's original Xbox wheel programs run on the PC, exactly like on the Xbox. No custom FFB profiles; only strength and rumble can be scaled. |
 | **Keyboard** | Drive with WASD, arrow keys move the camera while driving and scroll in menus, Enter/Backspace/Esc in menus, FH5-like bindings. Works together with a controller (one merged pad, no "player 2" problems). Bindings in `FH2_Keyboard.ini`. While a wheel is connected, the game drives with the wheel. |
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
@@ -76,6 +76,7 @@ Also tell us your device (controller, keyboard or wheel) and your Azimuth versio
 - **[Almost There Games](https://almost-there-games.itch.io/azimuth)** – Azimuth wrapper (not included)
 - **[Flenkii](https://github.com/Flenkii)** – idea, testing, maintainer of this fork
 - **Claude (Anthropic)** – wrote most of the new code in this fork together with Flenkii
+- **Lancaster** (Discord) – tested on a game copy without the Wheel DLL and had the idea "clutch pedal as brake"
 
 ## Known issues
 - **Traffic settings need an Azimuth restart.** `Traffic: Preset` and `Traffic: Amount` in the in-game menu are
@@ -110,6 +111,7 @@ Optional parts of the ZIP:
 | `Optional/Profiles/Controller` | controller only (wheel and keyboard off) |
 | `Optional/Profiles/Keyboard` | keyboard (+ controller), wheel off |
 | `Optional/Profiles/Wheel` | wheel with the game's force feedback (= default) |
+| `Optional/Profiles/Wheel_ClutchAsBrake` | like Wheel, but the clutch pedal brakes (the G920 brake pedal is stiff) |
 
 A profile is a pair `FH2_Wheel.ini` + `FH2_Keyboard.ini`; copy both next to `azimuth.exe` (replaces yours).
 
@@ -118,7 +120,8 @@ New INI keys of this fork in `FH2_ExtraOptions.ini`, section `[Traffic]`:
 the old name `Wetter` is still understood).
 The wheel INI (`FH2_Wheel.ini`) and the keyboard INI (`FH2_Keyboard.ini`) are in English (since fork4). The German files
 of fork1-fork3 (`FH2_Lenkrad.ini`, `FH2_Tastatur.ini`) are taken over automatically on the first start; the old files
-are moved into `FH2_Settings_Backup`. Clutch pedal as brake: `BrakeAxis=Slider0` and `ClutchAxis=-` in `FH2_Wheel.ini`.
+are moved into `FH2_Settings_Backup`. Clutch pedal as brake: in the game (Options › HUD › "Wheel: Clutch Pedal as Brake") or `ClutchAsBrake=1` in
+`FH2_Wheel.ini` – idea by Lancaster.
 The old tuning keys of the fork1 FFB (`Damping`, `Friction` …) are only used as a fallback if the game's wheel
 programs are not available.
 

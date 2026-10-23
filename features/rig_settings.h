@@ -23,7 +23,8 @@ enum {
     RIG_WHEEL_BUTTON1,   /* ZusatzFunktion1  WHEEL_FUNCTION_* of extra button 1 (RSB) */
     RIG_WHEEL_BUTTON2,   /* ZusatzFunktion2  extra button 2 (LSB) */
     RIG_WHEEL_BUTTON3,   /* ZusatzFunktion3  extra button 3 (Xbox button) */
-    RIG_WHEEL_FFB_MODE,  /* FFBModus         0 = the game's wheel programs, 1 = own FFB */
+    RIG_WHEEL_FFB_MODE,  /* FFBMode          0 = the game's wheel programs, 1 = own FFB */
+    RIG_WHEEL_CLUTCH_BRAKE, /* ClutchAsBrake 0/1: the clutch pedal brakes */
     RIG_WHEEL_COUNT,
     RIG_TRAFFIC_LEVEL = RIG_WHEEL_COUNT, /* [Traffic] TrafficLevel   0..5 */
     RIG_TRAFFIC_ALL_DAY,                 /* [Traffic] RushHourAllDay 0/1 */
