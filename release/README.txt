@@ -39,6 +39,14 @@ into your Azimuth folder (replaces your FH2_Lenkrad.ini and FH2_Tastatur.ini):
   Wheel        – wheel with the game's original force feedback, keyboard stays on (default)
 
 
+PROBLEMS? Please report them on GitHub Issues:
+  https://github.com/Flenkii/FH2-ExtraOptions-Wheel-Weather/issues
+Attach these files from your Azimuth folder (next to azimuth.exe):
+  - FH2_ExtraOptions.log                    (always)
+  - FH2_Lenkrad.log                         (wheel problems)
+  - FH2_Lenkrad.ini and FH2_Tastatur.ini    (your settings)
+Start the game, reproduce the problem, close the game, then attach the files.
+
 Known issues:
   - Traffic settings only apply after restarting Azimuth.
   - Fog only exists on Storm Island, everywhere else it is sunny.
@@ -53,3 +61,5 @@ Das Lenkrad nutzt das originale Force Feedback des Spiels. Ist ein Lenkrad einge
 fährt das Spiel nur damit; zum Fahren mit Tastatur/Controller "Lenkrad: Lenkrad im Spiel"
 auf Aus stellen und neu starten. Optional\Profiles: fertige INI-Paare (nur Controller /
 Tastatur / Lenkrad). Keine H-Schaltung: FH2 kennt nur Hoch- und Runterschalten.
+Probleme bitte auf GitHub unter "Issues" melden und FH2_ExtraOptions.log, FH2_Lenkrad.log
+(bei Lenkrad-Problemen), FH2_Lenkrad.ini und FH2_Tastatur.ini anhängen (neben azimuth.exe).

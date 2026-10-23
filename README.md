@@ -21,7 +21,8 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 > releases or build it yourself from source.
 
 > ⚠️ **Unofficial.** Neither the Extra Options author nor the Azimuth developer supports this fork.
-> Please do **not** report issues with this fork to them. Report Azimuth bugs only without mods.
+> Please do **not** report issues with this fork to them – report them here instead, see
+> [Reporting problems](#reporting-problems). Report Azimuth bugs to its developer only without mods.
 
 ## Compatibility
 Tested only with this combination – other versions may not work:
@@ -56,6 +57,19 @@ The same list is in `Keybindings.txt` in the release ZIP.
 
 Driving functions follow the controller layout chosen in the game. Several keys per function are possible
 (comma-separated); key names are listed at the top of `FH2_Tastatur.ini`.
+
+## Reporting problems
+Please report problems on GitHub: [**Issues → New issue**](../../issues/new/choose). Attach these files from your
+Azimuth folder (next to `azimuth.exe`) so we can help:
+
+| File | When |
+|---|---|
+| `FH2_ExtraOptions.log` | always |
+| `FH2_Lenkrad.log` | wheel problems |
+| `FH2_Lenkrad.ini`, `FH2_Tastatur.ini` | your settings (wheel / keyboard) |
+
+Start the game, reproduce the problem, close the game, then attach the files (drag them into the issue text box).
+Also tell us your device (controller, keyboard or wheel) and your Azimuth version.
 
 ## Credits
 - **[RokkuDayo](https://github.com/RokkuDayo)** – [Extra Options](https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions), the base of this fork
