@@ -8,7 +8,7 @@ All features of the original are included unchanged – see [README_ORIGINAL.md]
 |---|---|
 | **Wheel bridge (Logitech G920)** | The wheel is reported to the game as an Xbox wheel: steering, pedals, clutch, paddles, buttons. Also works on game copies without `Microsoft.Xbox.Input.Wheel.dll` (the mod brings its own version). |
 | **Force feedback** | The **game's own wheel force feedback** – FH2's original Xbox wheel programs run on the PC, exactly like on the Xbox. No custom FFB profiles; only strength and rumble can be scaled. |
-| **Keyboard** | Drive with WASD, arrow keys move the camera while driving and scroll in menus, Enter/Backspace/Esc in menus, FH5-like bindings. Works together with a controller (one merged pad, no "player 2" problems). Bindings in `FH2_Tastatur.ini`. While a wheel is connected, the game drives with the wheel. |
+| **Keyboard** | Drive with WASD, arrow keys move the camera while driving and scroll in menus, Enter/Backspace/Esc in menus, FH5-like bindings. Works together with a controller (one merged pad, no "player 2" problems). Bindings in `FH2_Keyboard.ini`. While a wheel is connected, the game drives with the wheel. |
 | **Free wheel buttons** | RSB, LSB and the Xbox button can be assigned (look back/left/right, camera, handbrake, radio, shifting …). |
 | **In-game "Wheel & Traffic" page** | Options › HUD › bottom. All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
@@ -37,7 +37,7 @@ Tested only with this combination – other versions may not work:
 A new Azimuth release may break this mod. If Extra Options detects a mismatch it disables itself.
 Updates will follow when possible.
 
-## Keyboard bindings (default, editable in `FH2_Tastatur.ini`)
+## Keyboard bindings (default, editable in `FH2_Keyboard.ini`)
 
 | Key | Function | Key | Function |
 |---|---|---|---|
@@ -56,7 +56,7 @@ Updates will follow when possible.
 The same list is in `Keybindings.txt` in the release ZIP.
 
 Driving functions follow the controller layout chosen in the game. Several keys per function are possible
-(comma-separated); key names are listed at the top of `FH2_Tastatur.ini`.
+(comma-separated); key names are listed at the top of `FH2_Keyboard.ini`.
 
 ## Reporting problems
 Please report problems on GitHub: [**Issues → New issue**](../../issues/new/choose). Attach these files from your
@@ -65,8 +65,8 @@ Azimuth folder (next to `azimuth.exe`) so we can help:
 | File | When |
 |---|---|
 | `FH2_ExtraOptions.log` | always |
-| `FH2_Lenkrad.log` | wheel problems |
-| `FH2_Lenkrad.ini`, `FH2_Tastatur.ini` | your settings (wheel / keyboard) |
+| `FH2_Wheel.log` | wheel problems |
+| `FH2_Wheel.ini`, `FH2_Keyboard.ini` | your settings (wheel / keyboard) |
 
 Start the game, reproduce the problem, close the game, then attach the files (drag them into the issue text box).
 Also tell us your device (controller, keyboard or wheel) and your Azimuth version.
@@ -100,7 +100,7 @@ Also tell us your device (controller, keyboard or wheel) and your Azimuth versio
 2. From the [release](../../releases) ZIP, copy the files from the `Azimuth` folder (`winmm.dll`, `FH2_ExtraOptions.ini`)
    into the Azimuth folder (next to `azimuth.exe`). Back up your old `winmm.dll` first.
 3. Done – controller, keyboard and a wheel are detected automatically. Settings are in-game under
-   Options › HUD › bottom, or in `FH2_Lenkrad.ini` / `FH2_Tastatur.ini` (created on first start).
+   Options › HUD › bottom, or in `FH2_Wheel.ini` / `FH2_Keyboard.ini` (created on first start).
    Wheel: keep 900° in G HUB.
 
 Optional parts of the ZIP:
@@ -111,12 +111,15 @@ Optional parts of the ZIP:
 | `Optional/Profiles/Keyboard` | keyboard (+ controller), wheel off |
 | `Optional/Profiles/Wheel` | wheel with the game's force feedback (= default) |
 
-A profile is a pair `FH2_Lenkrad.ini` + `FH2_Tastatur.ini`; copy both next to `azimuth.exe` (replaces yours).
+A profile is a pair `FH2_Wheel.ini` + `FH2_Keyboard.ini`; copy both next to `azimuth.exe` (replaces yours).
 
 New INI keys of this fork in `FH2_ExtraOptions.ini`, section `[Traffic]`:
-`TrafficLevel` (0–5), `RushHourAllDay` (0/1), `Wetter` (weather: 0 original, 1 sunny, 2 cloudy, 3 storm clouds, 4 rain, 5 fog).
-The wheel INI (`FH2_Lenkrad.ini`) and the keyboard INI (`FH2_Tastatur.ini`) use German key names.
-The old tuning keys of the fork1 FFB (`Daempfung`, `Reibung` …) are only used as a fallback if the game's wheel
+`TrafficLevel` (0–5), `RushHourAllDay` (0/1), `Weather` (0 original, 1 sunny, 2 cloudy, 3 storm clouds, 4 rain, 5 fog;
+the old name `Wetter` is still understood).
+The wheel INI (`FH2_Wheel.ini`) and the keyboard INI (`FH2_Keyboard.ini`) are in English (since fork4). The German files
+of fork1-fork3 (`FH2_Lenkrad.ini`, `FH2_Tastatur.ini`) are taken over automatically on the first start; the old files
+are moved into `FH2_Settings_Backup`. Clutch pedal as brake: `BrakeAxis=Slider0` and `ClutchAxis=-` in `FH2_Wheel.ini`.
+The old tuning keys of the fork1 FFB (`Damping`, `Friction` …) are only used as a fallback if the game's wheel
 programs are not available.
 
 ## Building

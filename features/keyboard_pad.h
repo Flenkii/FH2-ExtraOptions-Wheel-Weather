@@ -10,7 +10,7 @@
    players need no gamepad, gamepad players notice no difference, plugging a pad in or out
    while playing works.
 
-   Keys are bound to game functions (FH5-like defaults in FH2_Tastatur.ini). Driving functions
+   Keys are bound to game functions (FH5-like defaults in FH2_Keyboard.ini). Driving functions
    follow the controller layout chosen in the game (A/B/X/Y layouts), menu keys are fixed
    buttons (Enter = A, Backspace = B, Esc = Menu). The arrow keys move the left stick in menus
    and the camera (right stick) while driving. */
@@ -25,7 +25,7 @@ enum {
 };
 
 /* Process start (Azimuth adapter): hooks Azimuth's import. settings_directory holds
-   FH2_Tastatur.ini. Returns 1 when the hook is in place. */
+   FH2_Keyboard.ini. Returns 1 when the hook is in place. */
 int keyboard_pad_arm(unsigned char *host_image, const wchar_t *settings_directory);
 /* Game image mapped: controller layouts are followed from now on. */
 void keyboard_pad_game_start(unsigned char *game_image, const wchar_t *settings_directory);

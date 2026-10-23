@@ -201,6 +201,7 @@ CURRENT[0] = e
 original = {s: bytes(e.mu.mem_read(GAME + s, 5)) for s in (0x106c65b, 0x106ca23, 0x2f8f1f, 0x2f8f3b, 0x2f8f57, 0x2fd673)}
 e.call('Fh2TestVideoPrepare', GAME)
 r = e.call('Fh2TestRigStart', GAME, e.put_wstr('C:\\test\\game\\forza_durango_release_final.exe'), e.put_wstr('C:\\test'))
+wheel_before = open(os.path.join(root, 'FH2_Wheel.ini'), 'rb').read().decode('latin1')
 check(r == 1, 'Start ok')
 check(len(e.allocations) == 1, f'eine Code-Seite nahe am Spiel angelegt: {[hex(a) for a in e.allocations]}')
 page = e.allocations[0] if e.allocations else 0
@@ -209,7 +210,7 @@ for s, b in original.items():
     now = bytes(e.mu.mem_read(GAME + s, 5))
     target = GAME + s + 5 + struct.unpack('<i', now[1:])[0]
     check(now[0] == 0xe8 and page <= target < page + 0x1000, f'0x{s:x}: {b.hex()} -> call Seite+0x{target - page:x}')
-log = open(os.path.join(root, 'FH2_Lenkrad.log'), 'rb').read().decode('latin1')
+log = open(os.path.join(root, 'FH2_Wheel.log'), 'rb').read().decode('latin1')
 check('Spiel-Hooks gesetzt' in log, 'Log: Spiel-Hooks gesetzt')
 check('Taste 8 -> Funktion 2, Taste 9 -> Funktion 1, Taste 10 -> Funktion 0' in log, 'Standard: RSB=Blick zurück, LSB=Kamera, Xbox=aus')
 install_game_stubs(e)
@@ -316,14 +317,15 @@ for f, expect in [('CAMERA', (0x80, 0)), ('REWIND', (0x40, 0)), ('TELE', (0, 0x0
     check(report(1 << 9) == expect, f'LSB = {f} -> {expect}')
 report(0)
 
-print('Speichern in FH2_Lenkrad.ini')
+print('Speichern in FH2_Wheel.ini')
 e.tick += 2000
 e.call('Fh2TestRigStep', e.tick)
-ini = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read().decode('latin1')
-check('ZusatzFunktion1=4' in ini and 'ZusatzFunktion2=13' in ini and 'ZusatzFunktion3=10' in ini,
-      'ZusatzFunktion1..3 gespeichert')
-fixture = open(os.path.join(HERE, 'fixture', 'FH2_Lenkrad.ini'), 'rb').read().decode('latin1')
-check(ini.startswith(fixture.rstrip('\r\n')[:len(fixture) - 40]), 'restliche Datei unverändert')
+ini = open(os.path.join(root, 'FH2_Wheel.ini'), 'rb').read().decode('latin1')
+check('ExtraFunction1=4' in ini and 'ExtraFunction2=13' in ini and 'ExtraFunction3=10' in ini,
+      'ExtraFunction1..3 gespeichert')
+import re
+strip = lambda t: re.sub(r'ExtraFunction\d=\d+', '', t)
+check(strip(ini) == strip(wheel_before), 'restliche Datei unverändert')
 
 # =====================================================================================
 print('Abweichender Spielcode (z. B. andere Spielversion)')
@@ -333,7 +335,7 @@ e2.call('Fh2TestVideoPrepare', GAME)
 e2.call('Fh2TestRigStart', GAME, e2.put_wstr('C:\\test\\game\\forza_durango_release_final.exe'), e2.put_wstr('C:\\test'))
 check(e2.allocations == [], 'keine Hooks, kein Speicher angelegt')
 check(all(b == 0 for b in bytes(e2.mu.mem_read(GAME + 0x106c65b, 5))), 'Spielcode nicht angefasst')
-log2 = open(os.path.join(root2, 'FH2_Lenkrad.log'), 'rb').read().decode('latin1')
+log2 = open(os.path.join(root2, 'FH2_Wheel.log'), 'rb').read().decode('latin1')
 check('Spielcode weicht ab' in log2, 'Log erklärt es')
 v = e2.call('Fh2TestWheelReport', 1 << 9)
 check(v & 0xff == 0x80, 'Kamera auf LSB geht trotzdem (Standard-Layout 0)')

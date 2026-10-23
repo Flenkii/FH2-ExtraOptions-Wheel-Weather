@@ -2,56 +2,58 @@
  *
  * Holds the menu description of the wheel-bridge and More-Traffic settings, forwards
  * changes to the live modules and persists them in the launcher's INI files:
- *   FH2_Lenkrad.ini       [Lenkrad]  Aktiv, ForceFeedback, FFBStaerke, ...
- *   FH2_ExtraOptions.ini  [Traffic]  TrafficLevel, RushHourAllDay
+ *   FH2_Wheel.ini         [Wheel]     Enabled, ForceFeedback, FFBStrength, ...
+ *   FH2_Keyboard.ini      [Keyboard]  Enabled, SteerTime, ReturnTime, PedalTime
+ *   FH2_ExtraOptions.ini  [Traffic]   TrafficLevel, RushHourAllDay, Weather
  * Saving happens on a background thread shortly after the last change, by editing only the
  * affected lines (comments and every other key stay untouched). When the launcher changes
  * one of the files while the game runs, the new values are picked up within a second. */
 #include "weather.h"
 #include "rig_settings.h"
 #include "ini_edit.h"
+#include "ini_migrate.h"
 #include "logging.h"
 #include "support.h"
 #include "video_options_text.h"
 #include "wheel_buttons.h"
 #include "keyboard_pad.h"
 
-#define WHEEL_SECTION "Lenkrad"
+#define WHEEL_SECTION "Wheel"
 #define TRAFFIC_SECTION "Traffic"
-#define KEYBOARD_SECTION "Tastatur"
+#define KEYBOARD_SECTION "Keyboard"
 #define EO_INI_LIMIT 8192u
 #define FILE_LIMIT 16384u
 #define SAVE_DELAY_MS 600u
 
 static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
-    [RIG_WHEEL_ENABLED] = {"EoRigWheelEnabled", "Aktiv", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
+    [RIG_WHEEL_ENABLED] = {"EoRigWheelEnabled", "Enabled", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
     [RIG_WHEEL_FFB] = {"EoRigForceFeedback", "ForceFeedback", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
-    [RIG_WHEEL_STRENGTH] = {"EoRigStrength", "FFBStaerke", 0, 200, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_STRENGTH] = {"EoRigStrength", "FFBStrength", 0, 200, RIG_KIND_PERCENT, 0, 0.01f,
                             "EO_RigPercent200"},
-    [RIG_WHEEL_RUMBLE] = {"EoRigRumble", "Vibration", 0, 200, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_RUMBLE] = {"EoRigRumble", "Rumble", 0, 200, RIG_KIND_PERCENT, 0, 0.01f,
                           "EO_RigPercent200"},
-    [RIG_WHEEL_DAMPING] = {"EoRigDamping", "Daempfung", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_DAMPING] = {"EoRigDamping", "Damping", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
                            "A_Style_Slider_Options"},
-    [RIG_WHEEL_FRICTION] = {"EoRigFriction", "Reibung", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_FRICTION] = {"EoRigFriction", "Friction", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
                             "A_Style_Slider_Options"},
-    [RIG_WHEEL_SMOOTHING] = {"EoRigSmoothing", "Glaettung", 0, 200, RIG_KIND_NUMBER, 0, 1,
+    [RIG_WHEEL_SMOOTHING] = {"EoRigSmoothing", "Smoothing", 0, 200, RIG_KIND_NUMBER, 0, 1,
                              "EO_RigMilliseconds"},
-    [RIG_WHEEL_MINFORCE] = {"EoRigMinimumForce", "Mindestkraft", 0, 50, RIG_KIND_PERCENT, 0,
+    [RIG_WHEEL_MINFORCE] = {"EoRigMinimumForce", "MinimumForce", 0, 50, RIG_KIND_PERCENT, 0,
                             0.01f, "EO_RigPercent50"},
-    [RIG_WHEEL_OUTWARD] = {"EoRigOutward", "KraftNachAussen", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_OUTWARD] = {"EoRigOutward", "OutwardForce", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
                            "EO_RigPercent100"},
-    [RIG_WHEEL_CENTERING] = {"EoRigCentering", "Zentrierung", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
+    [RIG_WHEEL_CENTERING] = {"EoRigCentering", "Centering", 0, 100, RIG_KIND_PERCENT, 0, 0.01f,
                              "EO_RigPercent100"},
-    [RIG_WHEEL_LOCK] = {"EoRigLock", "Anschlag", 30, 450, RIG_KIND_NUMBER, 0, 1, "EO_RigLock"},
-    [RIG_WHEEL_CURVE] = {"EoRigCurve", "Kurve", 10, 60, RIG_KIND_NUMBER, 1, 0.1f, "EO_RigCurve"},
-    [RIG_WHEEL_ROTATION] = {"EoRigRotation", "Drehwinkel", 180, 2520, RIG_KIND_NUMBER, 0, 1,
+    [RIG_WHEEL_LOCK] = {"EoRigLock", "Lock", 30, 450, RIG_KIND_NUMBER, 0, 1, "EO_RigLock"},
+    [RIG_WHEEL_CURVE] = {"EoRigCurve", "Curve", 10, 60, RIG_KIND_NUMBER, 1, 0.1f, "EO_RigCurve"},
+    [RIG_WHEEL_ROTATION] = {"EoRigRotation", "Rotation", 180, 2520, RIG_KIND_NUMBER, 0, 1,
                             "EO_RigRotation"},
-    [RIG_WHEEL_SHIFTER] = {"EoRigShifter", "Schaltknauf", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
-    [RIG_WHEEL_BUTTON1] = {"EoRigButton1", "ZusatzFunktion1", 0, WHEEL_FUNCTION_COUNT - 1,
+    [RIG_WHEEL_SHIFTER] = {"EoRigShifter", "Shifter", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
+    [RIG_WHEEL_BUTTON1] = {"EoRigButton1", "ExtraFunction1", 0, WHEEL_FUNCTION_COUNT - 1,
                            RIG_KIND_FUNCTION, 0, 1, NULL},
-    [RIG_WHEEL_BUTTON2] = {"EoRigButton2", "ZusatzFunktion2", 0, WHEEL_FUNCTION_COUNT - 1,
+    [RIG_WHEEL_BUTTON2] = {"EoRigButton2", "ExtraFunction2", 0, WHEEL_FUNCTION_COUNT - 1,
                            RIG_KIND_FUNCTION, 0, 1, NULL},
-    [RIG_WHEEL_BUTTON3] = {"EoRigButton3", "ZusatzFunktion3", 0, WHEEL_FUNCTION_COUNT - 1,
+    [RIG_WHEEL_BUTTON3] = {"EoRigButton3", "ExtraFunction3", 0, WHEEL_FUNCTION_COUNT - 1,
                            RIG_KIND_FUNCTION, 0, 1, NULL},
     [RIG_TRAFFIC_LEVEL] = {"EoRigTrafficLevel", "TrafficLevel", 0, 5, RIG_KIND_TRAFFIC, 0, 1,
                            NULL},
@@ -61,21 +63,21 @@ static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
                            NULL},
     [RIG_TRAFFIC_PRESET] = {"EoRigDensity", "", 0, RIG_DENSITY_COUNT - 1, RIG_KIND_DENSITY, 0, 1,
                             NULL},
-    [RIG_WEATHER] = {"EoRigWeather", "Wetter", 0, RIG_WEATHER_COUNT - 1, RIG_KIND_WEATHER, 0, 1,
+    [RIG_WEATHER] = {"EoRigWeather", "Weather", 0, RIG_WEATHER_COUNT - 1, RIG_KIND_WEATHER, 0, 1,
                      NULL},
-    [RIG_WHEEL_FFB_MODE] = {"EoRigFfbMode", "FFBModus", 0, RIG_FFB_MODE_COUNT - 1, RIG_KIND_FFB_MODE,
+    [RIG_WHEEL_FFB_MODE] = {"EoRigFfbMode", "FFBMode", 0, RIG_FFB_MODE_COUNT - 1, RIG_KIND_FFB_MODE,
                             0, 1, NULL},
-    [RIG_KEY_ENABLED] = {"EoKeyEnabled", "Aktiv", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
-    [RIG_KEY_STEER] = {"EoKeySteer", "Lenkzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
-    [RIG_KEY_RETURN] = {"EoKeyReturn", "Rueckstellzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1,
+    [RIG_KEY_ENABLED] = {"EoKeyEnabled", "Enabled", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
+    [RIG_KEY_STEER] = {"EoKeySteer", "SteerTime", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
+    [RIG_KEY_RETURN] = {"EoKeyReturn", "ReturnTime", 0, 1000, RIG_KIND_NUMBER, 0, 1,
                         "EO_KeyTime"},
-    [RIG_KEY_PEDAL] = {"EoKeyPedal", "Pedalzeit", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
+    [RIG_KEY_PEDAL] = {"EoKeyPedal", "PedalTime", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
 };
 
 /* Rows of the menu. The force feedback is the game's own (its wheel programs), so the old
    tuning values of the mod's own FFB (profile, damping, friction, smoothing, minimum force,
    outward force, centring, lock, curve, FFB type) are no longer shown; they stay readable
-   from FH2_Lenkrad.ini for the fallback when the game's programs are not available.
+   from FH2_Wheel.ini for the fallback when the game's programs are not available.
    The H-pattern shifter is hidden too: the game reads the gear from the wheel but never
    uses it (FH2 only knows shift up / shift down). */
 static const unsigned char order[] = {
@@ -218,13 +220,13 @@ static const RigText german[RIG_SETTING_COUNT] = {
                            "Schaltknauf (Driving Force Shifter) benutzen. Wirkt sofort."},
     [RIG_WHEEL_BUTTON1] = {"Lenkrad: Taste RSB",
                            "Spielfunktion für die rechte Stick-Taste am Lenkrad (G920: RSB, in "
-                           "FH2_Lenkrad.ini ZusatzTaste1). Wirkt sofort."},
+                           "FH2_Wheel.ini ExtraButton1). Wirkt sofort."},
     [RIG_WHEEL_BUTTON2] = {"Lenkrad: Taste LSB",
                            "Spielfunktion für die linke Stick-Taste am Lenkrad (G920: LSB, in "
-                           "FH2_Lenkrad.ini ZusatzTaste2). Wirkt sofort."},
+                           "FH2_Wheel.ini ExtraButton2). Wirkt sofort."},
     [RIG_WHEEL_BUTTON3] = {"Lenkrad: Xbox-Taste",
-                           "Spielfunktion für die Xbox-Taste am Lenkrad (in FH2_Lenkrad.ini "
-                           "ZusatzTaste3). Achtung: Windows kann damit die Xbox Game Bar öffnen. "
+                           "Spielfunktion für die Xbox-Taste am Lenkrad (in FH2_Wheel.ini "
+                           "ExtraButton3). Achtung: Windows kann damit die Xbox Game Bar öffnen. "
                            "Wirkt sofort."},
     [RIG_TRAFFIC_LEVEL] = {"Verkehr: Menge",
                            "Höchstzahl der Verkehrsautos. Wird sofort gespeichert, wirkt aber erst "
@@ -257,7 +259,7 @@ static const RigText german[RIG_SETTING_COUNT] = {
                          "Die Tastatur steuert das Spiel wie ein Gamepad: W/S Gas und Bremse, A/D "
                          "lenken, Leertaste Handbremse, E/Q schalten, Pfeiltasten = Kamera beim "
                          "Fahren und Blättern in Menüs, Enter/Rücktaste/Esc in Menüs. Belegung "
-                         "in FH2_Tastatur.ini. Controller funktionieren weiter. Mit eingestecktem "
+                         "in FH2_Keyboard.ini. Controller funktionieren weiter. Mit eingestecktem "
                          "Lenkrad fährt das Spiel nur mit dem Lenkrad. Wirkt nach einem Neustart "
                          "des Spiels."},
     [RIG_KEY_STEER] = {"Tastatur: Lenkzeit (ms)",
@@ -318,13 +320,13 @@ static const RigText english[RIG_SETTING_COUNT] = {
                            "Use the Driving Force Shifter. Applies immediately."},
     [RIG_WHEEL_BUTTON1] = {"Wheel: RSB Button",
                            "Game function for the wheel's right stick button (G920: RSB, "
-                           "ZusatzTaste1 in FH2_Lenkrad.ini). Applies immediately."},
+                           "ExtraButton1 in FH2_Wheel.ini). Applies immediately."},
     [RIG_WHEEL_BUTTON2] = {"Wheel: LSB Button",
                            "Game function for the wheel's left stick button (G920: LSB, "
-                           "ZusatzTaste2 in FH2_Lenkrad.ini). Applies immediately."},
+                           "ExtraButton2 in FH2_Wheel.ini). Applies immediately."},
     [RIG_WHEEL_BUTTON3] = {"Wheel: Xbox Button",
-                           "Game function for the wheel's Xbox button (ZusatzTaste3 in "
-                           "FH2_Lenkrad.ini). Windows may open the Xbox Game Bar with it. "
+                           "Game function for the wheel's Xbox button (ExtraButton3 in "
+                           "FH2_Wheel.ini). Windows may open the Xbox Game Bar with it. "
                            "Applies immediately."},
     [RIG_TRAFFIC_LEVEL] = {"Traffic: Amount",
                            "Maximum number of traffic cars. Saved immediately, but only applies after "
@@ -355,7 +357,7 @@ static const RigText english[RIG_SETTING_COUNT] = {
                          "The keyboard controls the game like a gamepad: W/S throttle and brake, "
                          "A/D steer, Space handbrake, E/Q shift, arrow keys = camera while driving "
                          "and scrolling in menus, Enter/Backspace/Esc in menus. Bindings in "
-                         "FH2_Tastatur.ini. Controllers keep working. While a wheel is plugged "
+                         "FH2_Keyboard.ini. Controllers keep working. While a wheel is plugged "
                          "in, the game drives with the wheel only. Restart the game to apply."},
     [RIG_KEY_STEER] = {"Keyboard: Steering Time (ms)",
                        "Time to full lock while you hold A or D. Higher = smoother. Applies "
@@ -623,11 +625,11 @@ typedef struct {
 } RigFile;
 
 static RigFile files[3] = {
-    {NULL, WHEEL_SECTION, 0, RIG_WHEEL_COUNT, FILE_LIMIT, 1, 0, "FH2_Lenkrad.ini", 0},
+    {NULL, WHEEL_SECTION, 0, RIG_WHEEL_COUNT, FILE_LIMIT, 1, 0, "FH2_Wheel.ini", 0},
     /* never create the Extra Options INI: its absence means "all defaults" */
     {traffic_ini, TRAFFIC_SECTION, RIG_TRAFFIC_LEVEL, RIG_WEATHER + 1, EO_INI_LIMIT, 0, 0,
      "FH2_ExtraOptions.ini", 0},
-    {NULL, KEYBOARD_SECTION, RIG_KEY_FIRST, RIG_KEY_END, FILE_LIMIT, 1, 0, "FH2_Tastatur.ini", 0},
+    {NULL, KEYBOARD_SECTION, RIG_KEY_FIRST, RIG_KEY_END, FILE_LIMIT, 1, 0, "FH2_Keyboard.ini", 0},
 };
 
 static void log_line(const char *first, const char *second);
@@ -793,7 +795,7 @@ void rig_settings_start(const wchar_t *settings_directory) {
     CloseHandle(thread);
     started = 1;
     log_append("MENU: Lenkrad & Verkehr page ready (HUD options); changes apply live and are "
-               "saved to FH2_Lenkrad.ini / FH2_Tastatur.ini / FH2_ExtraOptions.ini.\r\n");
+               "saved to FH2_Wheel.ini / FH2_Keyboard.ini / FH2_ExtraOptions.ini.\r\n");
 }
 
 #ifdef FH2_TWEAKS_TEST
@@ -802,6 +804,7 @@ void rig_settings_start(const wchar_t *settings_directory) {
 __declspec(dllexport) int Fh2TestRigStart(unsigned char *image, const wchar_t *executable,
                                           const wchar_t *directory) {
     ModOptions options;
+    ini_migrate(directory);
     int ok = settings_read(directory, &options);
     log_set_directory(directory);
     traffic_tunables_start(image, &options);

@@ -1,3 +1,4 @@
+#include "features/ini_migrate.h"
 #include "runtime.h"
 #include "features.h"
 #include "features/keyboard_pad.h"
@@ -61,6 +62,7 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
     settings_defaults(&options);
     gamerpic_set_directory(settings_directory);
     log_reset();
+    ini_migrate(settings_directory); /* German files of fork1-fork3 -> English ones */
     int initialized = settings_read(settings_directory, &options);
     if (initialized) {
         video_settings_load(settings_directory);
@@ -74,6 +76,9 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
         initialized = patch_engine_apply(game_image, &options);
     }
     log_start(settings_directory, &options);
+    log_set_directory(settings_directory);
+    ini_migrate_log();
+    log_reset();
 #ifdef FH2_AZIMUTH
     if (initialized && options.enabled) {
         log_set_directory(settings_directory);

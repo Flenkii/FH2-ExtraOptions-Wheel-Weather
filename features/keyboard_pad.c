@@ -1,10 +1,11 @@
 /* Keyboard as a gamepad (unofficial add-on). See keyboard_pad.h. */
 #include "keyboard_pad.h"
+#include "ini_migrate.h"
 #include "game_addresses.h"
 #include "logging.h"
 #include "support.h"
 
-#define KEY_INI L"FH2_Tastatur.ini"
+#define KEY_INI L"FH2_Keyboard.ini"
 #define MAX_PADS 8
 
 typedef HRESULT(WINAPI *GetFactoryFn)(void *, const GUID *, void **);
@@ -54,8 +55,8 @@ static const GUID IID_Gamepad = {0xbc7bb43c, 0x0a69, 0x3903, {0x9e, 0x9d, 0xa5, 
 static wchar_t ini_path[PATH_CAPACITY];
 static volatile LONG values[KEY_SETTING_COUNT];
 static int loaded;
-static const wchar_t *const setting_keys[KEY_SETTING_COUNT] = {L"Aktiv", L"Lenkzeit", L"Rueckstellzeit",
-                                                               L"Pedalzeit"};
+static const wchar_t *const setting_keys[KEY_SETTING_COUNT] = {L"Enabled", L"SteerTime", L"ReturnTime",
+                                                               L"PedalTime"};
 static const int setting_defaults[KEY_SETTING_COUNT] = {1, 150, 90, 60};
 static const int setting_min[KEY_SETTING_COUNT] = {0, 0, 0, 0};
 static const int setting_max[KEY_SETTING_COUNT] = {1, 1000, 1000, 1000};
@@ -83,40 +84,40 @@ enum {
 };
 
 static Binding bindings[] = {
-    {L"Gas", KIND_ACTION, 0, L"W", {0}},
-    {L"Bremse", KIND_ACTION, 1, L"S", {0}},
-    {L"LenkenLinks", KIND_STEER, 0, L"A", {0}},
-    {L"LenkenRechts", KIND_STEER, 1, L"D", {0}},
-    {L"Handbremse", KIND_ACTION, 3, L"Leertaste", {0}},
-    {L"Hochschalten", KIND_ACTION, 4, L"E", {0}},
-    {L"Runterschalten", KIND_ACTION, 5, L"Q", {0}},
-    {L"Kupplung", KIND_ACTION, 6, L"LShift", {0}},
-    {L"Kamera", KIND_ACTION, 17, L"Tab", {0}},
-    {L"Zurueckspulen", KIND_ACTION, 20, L"R", {0}},
-    {L"Telemetrie", KIND_ACTION, 14, L"T", {0}},
-    {L"Fotomodus", KIND_ACTION, 15, L"P", {0}},
-    {L"RadioZurueck", KIND_ACTION, 23, L"Minus", {0}},
-    {L"RadioWeiter", KIND_ACTION, 24, L"Plus", {0}},
-    {L"BlickZurueck", KIND_ACTION, 10, L"C,Num2", {0}},
-    {L"BlickLinks", KIND_ACTION, 11, L"Num4", {0}},
-    {L"BlickRechts", KIND_ACTION, 12, L"Num6", {0}},
-    {L"Licht", KIND_FIXED, IN_RS, L"L", {0}},
-    {L"Karte", KIND_FIXED, IN_VIEW, L"M", {0}},
+    {L"Throttle", KIND_ACTION, 0, L"W", {0}},
+    {L"Brake", KIND_ACTION, 1, L"S", {0}},
+    {L"SteerLeft", KIND_STEER, 0, L"A", {0}},
+    {L"SteerRight", KIND_STEER, 1, L"D", {0}},
+    {L"Handbrake", KIND_ACTION, 3, L"Space", {0}},
+    {L"ShiftUp", KIND_ACTION, 4, L"E", {0}},
+    {L"ShiftDown", KIND_ACTION, 5, L"Q", {0}},
+    {L"Clutch", KIND_ACTION, 6, L"LShift", {0}},
+    {L"Camera", KIND_ACTION, 17, L"Tab", {0}},
+    {L"Rewind", KIND_ACTION, 20, L"R", {0}},
+    {L"Telemetry", KIND_ACTION, 14, L"T", {0}},
+    {L"PhotoMode", KIND_ACTION, 15, L"P", {0}},
+    {L"RadioPrevious", KIND_ACTION, 23, L"Minus", {0}},
+    {L"RadioNext", KIND_ACTION, 24, L"Plus", {0}},
+    {L"LookBack", KIND_ACTION, 10, L"C,Num2", {0}},
+    {L"LookLeft", KIND_ACTION, 11, L"Num4", {0}},
+    {L"LookRight", KIND_ACTION, 12, L"Num6", {0}},
+    {L"Lights", KIND_FIXED, IN_RS, L"L", {0}},
+    {L"Map", KIND_FIXED, IN_VIEW, L"M", {0}},
     {L"Pause", KIND_FIXED, IN_MENU, L"Esc", {0}},
-    {L"Bestaetigen", KIND_FIXED, IN_A, L"Enter", {0}},
-    {L"Zurueck", KIND_FIXED, IN_B, L"Rueck", {0}},
-    {L"TasteX", KIND_FIXED, IN_X, L"X", {0}},
-    {L"TasteY", KIND_FIXED, IN_Y, L"Y", {0}},
-    {L"TabLinks", KIND_FIXED, IN_LB, L"BildHoch", {0}},
-    {L"TabRechts", KIND_FIXED, IN_RB, L"BildRunter", {0}},
-    {L"PfeilHoch", KIND_NAV, 0, L"Hoch", {0}},
-    {L"PfeilRunter", KIND_NAV, 1, L"Runter", {0}},
-    {L"PfeilLinks", KIND_NAV, 2, L"Links", {0}},
-    {L"PfeilRechts", KIND_NAV, 3, L"Rechts", {0}},
-    {L"SteuerkreuzHoch", KIND_FIXED, IN_DPAD_UP, L"-", {0}},
-    {L"SteuerkreuzRunter", KIND_FIXED, IN_DPAD_DOWN, L"-", {0}},
-    {L"SteuerkreuzLinks", KIND_FIXED, IN_DPAD_LEFT, L"-", {0}},
-    {L"SteuerkreuzRechts", KIND_FIXED, IN_DPAD_RIGHT, L"-", {0}},
+    {L"Confirm", KIND_FIXED, IN_A, L"Enter", {0}},
+    {L"Back", KIND_FIXED, IN_B, L"Backspace", {0}},
+    {L"ButtonX", KIND_FIXED, IN_X, L"X", {0}},
+    {L"ButtonY", KIND_FIXED, IN_Y, L"Y", {0}},
+    {L"TabLeft", KIND_FIXED, IN_LB, L"PageUp", {0}},
+    {L"TabRight", KIND_FIXED, IN_RB, L"PageDown", {0}},
+    {L"ArrowUp", KIND_NAV, 0, L"Up", {0}},
+    {L"ArrowDown", KIND_NAV, 1, L"Down", {0}},
+    {L"ArrowLeft", KIND_NAV, 2, L"Left", {0}},
+    {L"ArrowRight", KIND_NAV, 3, L"Right", {0}},
+    {L"DpadUp", KIND_FIXED, IN_DPAD_UP, L"-", {0}},
+    {L"DpadDown", KIND_FIXED, IN_DPAD_DOWN, L"-", {0}},
+    {L"DpadLeft", KIND_FIXED, IN_DPAD_LEFT, L"-", {0}},
+    {L"DpadRight", KIND_FIXED, IN_DPAD_RIGHT, L"-", {0}},
 };
 
 static const struct {
@@ -133,12 +134,13 @@ static const struct {
     {"EINFG", 0x2d},     {"INSERT", 0x2d},    {"ENTF", 0x2e},       {"DELETE", 0x2e},    {"MINUS", 0xbd},
     {"PLUS", 0xbb},      {"KOMMA", 0xbc},     {"COMMA", 0xbc},      {"PUNKT", 0xbe},     {"PERIOD", 0xbe},
     {"MAUS1", 0x01},     {"MAUSLINKS", 0x01}, {"MAUS2", 0x02},      {"MAUSRECHTS", 0x02}, {"MAUS3", 0x04},
-    {"MAUSMITTE", 0x04}, {"MAUS4", 0x05},     {"MAUS5", 0x06},
+    {"MAUSMITTE", 0x04}, {"MAUS4", 0x05},     {"MAUS5", 0x06},      {"MOUSE1", 0x01},    {"MOUSE2", 0x02},
+    {"MOUSE3", 0x04},    {"MOUSE4", 0x05},    {"MOUSE5", 0x06},
 };
 
 static int read_int(const wchar_t *key, int fallback) {
     wchar_t text[32];
-    DWORD n = GetPrivateProfileStringW(L"Tastatur", key, L"", text, 32, ini_path);
+    DWORD n = GetPrivateProfileStringW(L"Keyboard", key, L"", text, 32, ini_path);
     int sign = 1, value = 0, any = 0;
     DWORD i = 0;
     while (i < n && text[i] == L' ') ++i;
@@ -198,44 +200,54 @@ static void parse_keys(Binding *b, const wchar_t *text) {
 }
 
 static const char default_ini[] =
-    "; FH2 Tastatur (inoffiziell) - Einstellungen / keyboard settings\r\n"
-    "; Die Werte oben stehen auch im Spiel: Optionen > HUD > ganz unten.\r\n"
+    "; FH2 keyboard (unofficial) - settings\r\n"
     "; The values at the top are also in the game: Options > HUD > bottom.\r\n"
-    "[Tastatur]\r\n"
-    "; 1 = Tastatur als Gamepad (wirkt nach Neustart) / keyboard as a gamepad\r\n"
-    "Aktiv=1\r\n"
-    "; Millisekunden bis voller Lenkeinschlag / zurueck zur Mitte / bis Vollgas\r\n"
-    "; milliseconds to full lock / back to the centre / to full throttle\r\n"
-    "Lenkzeit=150\r\n"
-    "Rueckstellzeit=90\r\n"
-    "Pedalzeit=60\r\n"
+    "; Changes in this file apply on the next game start.\r\n"
+    "[Keyboard]\r\n"
+    "; 1 = keyboard works as a gamepad, 0 = off (applies after a restart)\r\n"
+    "Enabled=1\r\n"
+    "; milliseconds to full steering lock / back to the centre / to full throttle\r\n"
+    "SteerTime=150\r\n"
+    "ReturnTime=90\r\n"
+    "PedalTime=60\r\n"
     "\r\n"
-    "; Tastenbelegung (mehrere Tasten mit Komma, - = keine). Buchstaben, Ziffern, F1-F12, Num0-Num9,\r\n"
-    "; Leertaste, Enter, Esc, Tab, Rueck, LShift, RShift, LStrg, RStrg, Alt, Hoch, Runter, Links,\r\n"
-    "; Rechts, BildHoch, BildRunter, Pos1, Ende, Einfg, Entf, Minus, Plus, Komma, Punkt,\r\n"
-    "; Maus1 (links), Maus2 (rechts), Maus3 (Mitte), Maus4, Maus5.\r\n"
-    "; Key bindings (several keys with commas, - = none). English names work too: Space, Backspace,\r\n"
-    "; Up, Down, Left, Right, PageUp, PageDown, Home, End, Insert, Delete, Comma, Period, Ctrl.\r\n"
-    "; Fahrfunktionen folgen der Controller-Belegung im Spiel / driving functions follow the\r\n"
-    "; controller layout chosen in the game. Menues / menus: Enter = A, Rueck = B, Esc = Menu.\r\n"
-    "; Pfeiltasten: in Menues blaettern, beim Fahren Kamera (rechter Stick) /\r\n"
-    "; arrow keys: menus = left stick, while driving = camera (right stick).\r\n";
+    "; Key bindings: several keys separated by commas, - = none.\r\n"
+    "; Key names: letters, digits, F1-F12, Num0-Num9, Space, Enter, Esc, Tab, Backspace,\r\n"
+    "; LShift, RShift, LCtrl, RCtrl, Alt, Up, Down, Left, Right, PageUp, PageDown, Home, End,\r\n"
+    "; Insert, Delete, Minus, Plus, Comma, Period, Mouse1 (left), Mouse2 (right), Mouse3 (middle),\r\n"
+    "; Mouse4, Mouse5.\r\n"
+    "; Driving functions follow the controller layout chosen in the game.\r\n"
+    "; Menus: Enter = A, Backspace = B, Esc = Menu.\r\n"
+    "; Arrow keys: in menus = left stick, while driving = camera (right stick).\r\n";
+
+/* Default file text including the key bindings (also used by ini_migrate.c). Returns the
+   length, 0 if it does not fit. */
+size_t keyboard_default_ini(char *out, size_t capacity) {
+    size_t n = 0;
+    for (size_t i = 0; i + 1 < sizeof(default_ini); ++i) {
+        if (n + 1 >= capacity) return 0;
+        out[n++] = default_ini[i];
+    }
+    for (unsigned i = 0; i < ARRAY_COUNT(bindings); ++i) {
+        if (n + 100 >= capacity) return 0;
+        for (const wchar_t *k = bindings[i].key; *k; ++k) out[n++] = (char)*k;
+        out[n++] = '=';
+        for (const wchar_t *k = bindings[i].defaults; *k; ++k) out[n++] = (char)*k;
+        out[n++] = '\r';
+        out[n++] = '\n';
+    }
+    out[n] = 0;
+    return n;
+}
 
 static void write_default_ini(void) {
+    static char text[4096];
+    size_t length = keyboard_default_ini(text, sizeof(text));
+    if (!length) return;
     HANDLE file = CreateFileW(ini_path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) return;
     DWORD written;
-    WriteFile(file, default_ini, sizeof(default_ini) - 1, &written, NULL);
-    for (unsigned i = 0; i < ARRAY_COUNT(bindings); ++i) {
-        char line[96];
-        unsigned n = 0;
-        for (const wchar_t *k = bindings[i].key; *k && n < 60; ++k) line[n++] = (char)*k;
-        line[n++] = '=';
-        for (const wchar_t *k = bindings[i].defaults; *k && n < 90; ++k) line[n++] = (char)*k;
-        line[n++] = '\r';
-        line[n++] = '\n';
-        WriteFile(file, line, n, &written, NULL);
-    }
+    WriteFile(file, text, (DWORD)length, &written, NULL);
     CloseHandle(file);
 }
 
@@ -248,7 +260,7 @@ static void settings_load(void) {
     }
     for (unsigned i = 0; i < ARRAY_COUNT(bindings); ++i) {
         wchar_t text[96];
-        GetPrivateProfileStringW(L"Tastatur", bindings[i].key, bindings[i].defaults, text, 96, ini_path);
+        GetPrivateProfileStringW(L"Keyboard", bindings[i].key, bindings[i].defaults, text, 96, ini_path);
         parse_keys(&bindings[i], text);
     }
     loaded = 1;
@@ -728,7 +740,7 @@ static HRESULT WINAPI hook_get_factory(void *name, const GUID *iid, void **out) 
     }
     if (!loaded) settings_load();
     if (!values[KEY_SETTING_ENABLED]) {
-        log_append("KEYBOARD: keyboard off (FH2_Tastatur.ini Aktiv=0); gamepads unchanged.\r\n");
+        log_append("KEYBOARD: keyboard off (FH2_Keyboard.ini Enabled=0); gamepads unchanged.\r\n");
         return original_get_factory(name, iid, out);
     }
     if (!real_statics) {
@@ -773,6 +785,7 @@ static void *volatile *find_factory_import(unsigned char *host) {
 
 int keyboard_pad_arm(unsigned char *host_image, const wchar_t *settings_directory) {
     if (!host_image || !settings_directory || !path_join(ini_path, settings_directory, KEY_INI)) return 0;
+    ini_migrate(settings_directory); /* German files of fork1-fork3 -> English ones */
     void *volatile *slot = find_factory_import(host_image);
     void *current = slot ? *slot : NULL;
     if (!current || current == (void *)(uintptr_t)hook_get_factory) return 0;
@@ -792,6 +805,7 @@ int keyboard_pad_arm(unsigned char *host_image, const wchar_t *settings_director
 
 void keyboard_pad_game_start(unsigned char *game_image, const wchar_t *settings_directory) {
     if (!ini_path[0] && (!settings_directory || !path_join(ini_path, settings_directory, KEY_INI))) return;
+    ini_migrate(settings_directory);
     if (!loaded) settings_load();
     game_base = game_image;
     if (values[KEY_SETTING_ENABLED]) wheel_buttons_install(game_image); /* follows the controller layout */

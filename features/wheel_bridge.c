@@ -19,6 +19,7 @@
 #include "logging.h"
 #include "ffb_vm.h"
 #include "wheel_soft.h"
+#include "ini_migrate.h"
 #include "rig_settings.h"
 #include "wheel_buttons.h"
 #include "support.h"
@@ -30,8 +31,8 @@
 #define IAT_GET_FACTORY 0x1dd1330u
 #define WHEEL_ID 0x000046dc26200920ull
 #define WHEEL_DLL L"Microsoft.Xbox.Input.Wheel.dll"
-#define WHEEL_INI L"FH2_Lenkrad.ini"
-#define WHEEL_LOG L"FH2_Lenkrad.log"
+#define WHEEL_INI L"FH2_Wheel.ini"
+#define WHEEL_LOG L"FH2_Wheel.log"
 
 typedef HRESULT(WINAPI *GetFactoryFn)(const wchar_t *, const GUID *, void **);
 typedef HRESULT(WINAPI *QIFn)(void *, const GUID *, void **);
@@ -282,7 +283,7 @@ static const char *const axis_names[] = {"X", "Y", "Z", "Rx", "Ry", "Rz", "Slide
 static int read_int(const wchar_t *key, int fallback) {
     wchar_t text[32];
     char ascii[32];
-    DWORD n = GetPrivateProfileStringW(L"Lenkrad", key, L"", text, 32, ini_path);
+    DWORD n = GetPrivateProfileStringW(L"Wheel", key, L"", text, 32, ini_path);
     if (!n) {
         return fallback;
     }
@@ -306,7 +307,7 @@ static int read_int(const wchar_t *key, int fallback) {
 static int read_axis(const wchar_t *key, int fallback) {
     wchar_t text[32];
     char ascii[32];
-    DWORD n = GetPrivateProfileStringW(L"Lenkrad", key, L"", text, 32, ini_path);
+    DWORD n = GetPrivateProfileStringW(L"Wheel", key, L"", text, 32, ini_path);
     if (!n) {
         return fallback;
     }
@@ -321,58 +322,67 @@ static int read_axis(const wchar_t *key, int fallback) {
 }
 
 static const char default_ini[] =
-    "; FH2 Lenkrad-Bruecke (inoffiziell) - Einstellungen\r\n"
-    "; Die wichtigsten Werte gibt es auch im Spiel: Optionen > HUD > ganz unten.\r\n"
-    "[Lenkrad]\r\n"
-    "; 1 = Lenkrad ans Spiel durchreichen, 0 = aus (dann fahren Tastatur/Controller); wirkt nach Neustart\r\n"
-    "Aktiv=1\r\n"
-    "; Teil des Geraetenamens (leer = automatisch, z.B. G920)\r\n"
-    "Geraet=\r\n"
-    "; Lenkwinkel in Grad (wie in G HUB eingestellt)\r\n"
-    "Drehwinkel=900\r\n"
-    "LenkungUmkehren=0\r\n"
-    "; Achsen: X Y Z Rx Ry Rz Slider0 Slider1 oder -\r\n"
-    "AchseLenkung=X\r\n"
-    "AchseGas=Y\r\n"
-    "AchseBremse=Rz\r\n"
-    "AchseKupplung=Slider0\r\n"
-    "; Tasten-Nummern (0 = erste Taste). Im Log stehen die Nummern gedrueckter Tasten.\r\n"
-    "TasteA=0\r\n"
-    "TasteB=1\r\n"
-    "TasteX=2\r\n"
-    "TasteY=3\r\n"
-    "WippeRechts=4\r\n"
-    "WippeLinks=5\r\n"
-    "TasteMenu=6\r\n"
-    "TasteView=7\r\n"
-    "; H-Schaltung (Driving Force Shifter): FH2 nutzt sie nicht, deshalb aus (0)\r\n"
-    "Schaltknauf=0\r\n"
-    "Gang1=12\r\n"
-    "Gang2=13\r\n"
-    "Gang3=14\r\n"
-    "Gang4=15\r\n"
-    "Gang5=16\r\n"
-    "Gang6=17\r\n"
-    "Rueckwaerts=18\r\n"
-    "RueckwaertsWert=255\r\n"
-    "; Force Feedback: 1 = an, 0 = aus\r\n"
+    "; FH2 wheel bridge (unofficial) - settings\r\n"
+    "; The most important values are also in the game: Options > HUD > bottom.\r\n"
+    "; Changes in this file apply on the next game start.\r\n"
+    "[Wheel]\r\n"
+    "; 1 = pass the wheel to the game, 0 = off (then keyboard/controller drive)\r\n"
+    "Enabled=1\r\n"
+    "; Part of the device name (empty = automatic, e.g. G920)\r\n"
+    "Device=\r\n"
+    "; Steering rotation in degrees (as set in G HUB)\r\n"
+    "Rotation=900\r\n"
+    "InvertSteering=0\r\n"
+    "; Axes: X Y Z Rx Ry Rz Slider0 Slider1 or - (none). G920: steering X, throttle Y,\r\n"
+    "; brake Rz, clutch Slider0.\r\n"
+    "; Clutch pedal as brake (the G920 brake pedal is stiff): BrakeAxis=Slider0 and ClutchAxis=-\r\n"
+    "SteeringAxis=X\r\n"
+    "ThrottleAxis=Y\r\n"
+    "BrakeAxis=Rz\r\n"
+    "ClutchAxis=Slider0\r\n"
+    "; Button numbers (0 = first button). The log shows the numbers of pressed buttons.\r\n"
+    "ButtonA=0\r\n"
+    "ButtonB=1\r\n"
+    "ButtonX=2\r\n"
+    "ButtonY=3\r\n"
+    "PaddleRight=4\r\n"
+    "PaddleLeft=5\r\n"
+    "ButtonMenu=6\r\n"
+    "ButtonView=7\r\n"
+    "; H-pattern shifter (Driving Force Shifter): FH2 does not use it, so it is off (0)\r\n"
+    "Shifter=0\r\n"
+    "Gear1=12\r\n"
+    "Gear2=13\r\n"
+    "Gear3=14\r\n"
+    "Gear4=15\r\n"
+    "Gear5=16\r\n"
+    "Gear6=17\r\n"
+    "Reverse=18\r\n"
+    "ReverseValue=255\r\n"
+    "; Force feedback: 1 = on, 0 = off\r\n"
     "ForceFeedback=1\r\n"
-    "; Das Force Feedback ist das originale des Spiels (seine Lenkrad-Programme, wie auf der Xbox).\r\n"
-    "; Staerke in Prozent (100 = wie auf der Xbox), Vibration in Prozent\r\n"
-    "FFBStaerke=100\r\n"
-    "Vibration=100\r\n"
-    "; Freie Tasten (Nummern siehe Log, -1 = keine): G920 RSB=8, LSB=9, Xbox-Taste=10\r\n"
-    "ZusatzTaste1=8\r\n"
-    "ZusatzTaste2=9\r\n"
-    "ZusatzTaste3=10\r\n"
-    "; Funktion je Taste: 0 aus, 1 Kamera, 2 Blick zurueck, 3 Blick links, 4 Blick rechts,\r\n"
-    "; 5 Zurueckspulen, 6 Telemetrie, 7 Fotomodus, 8 Radio zurueck, 9 Radio weiter,\r\n"
-    "; 10 Handbremse, 11 Kupplung, 12 Hochschalten, 13 Runterschalten\r\n"
-    "ZusatzFunktion1=2\r\n"
-    "ZusatzFunktion2=1\r\n"
-    "ZusatzFunktion3=0\r\n"
-    "; Ausfuehrliches Protokoll in FH2_Lenkrad.log\r\n"
+    "; The force feedback is the game's original one (its wheel programs, like on the Xbox).\r\n"
+    "; Strength in percent (100 = like on the Xbox, up to 200), rumble in percent\r\n"
+    "FFBStrength=100\r\n"
+    "Rumble=100\r\n"
+    "; Free wheel buttons (numbers see log, -1 = none): G920 RSB=8, LSB=9, Xbox button=10\r\n"
+    "ExtraButton1=8\r\n"
+    "ExtraButton2=9\r\n"
+    "ExtraButton3=10\r\n"
+    "; Function per button: 0 off, 1 camera, 2 look back, 3 look left, 4 look right,\r\n"
+    "; 5 rewind, 6 telemetry, 7 photo mode, 8 radio previous, 9 radio next,\r\n"
+    "; 10 handbrake, 11 clutch, 12 shift up, 13 shift down\r\n"
+    "ExtraFunction1=2\r\n"
+    "ExtraFunction2=1\r\n"
+    "ExtraFunction3=0\r\n"
+    "; Detailed log in FH2_Wheel.log\r\n"
     "Log=1\r\n";
+
+/* Default file text (also used to move an old FH2_Lenkrad.ini over, see ini_migrate.c). */
+const char *wheel_bridge_default_ini(size_t *length) {
+    if (length) *length = sizeof(default_ini) - 1;
+    return default_ini;
+}
 
 static void config_load(void) {
     if (GetFileAttributesW(ini_path) == INVALID_FILE_ATTRIBUTES) {
@@ -384,50 +394,50 @@ static void config_load(void) {
             CloseHandle(file);
         }
     }
-    cfg.enabled = read_int(L"Aktiv", 1);
-    cfg.rotation = read_int(L"Drehwinkel", 900);
+    cfg.enabled = read_int(L"Enabled", 1);
+    cfg.rotation = read_int(L"Rotation", 900);
     if (cfg.rotation < 180 || cfg.rotation > 2520) cfg.rotation = 900;
-    cfg.invert_steering = read_int(L"LenkungUmkehren", 0);
-    cfg.axis_steer = read_axis(L"AchseLenkung", 0);
-    cfg.axis_throttle = read_axis(L"AchseGas", 1);
-    cfg.axis_brake = read_axis(L"AchseBremse", 5);
-    cfg.axis_clutch = read_axis(L"AchseKupplung", 6);
-    cfg.btn_a = read_int(L"TasteA", 0);
-    cfg.btn_b = read_int(L"TasteB", 1);
-    cfg.btn_x = read_int(L"TasteX", 2);
-    cfg.btn_y = read_int(L"TasteY", 3);
-    cfg.btn_paddle_right = read_int(L"WippeRechts", 4);
-    cfg.btn_paddle_left = read_int(L"WippeLinks", 5);
-    cfg.btn_menu = read_int(L"TasteMenu", 6);
-    cfg.btn_view = read_int(L"TasteView", 7);
-    cfg.shifter = read_int(L"Schaltknauf", 0);
-    static const wchar_t *const gear_keys[7] = {L"Gang1", L"Gang2", L"Gang3", L"Gang4",
-                                                L"Gang5", L"Gang6", L"Rueckwaerts"};
+    cfg.invert_steering = read_int(L"InvertSteering", 0);
+    cfg.axis_steer = read_axis(L"SteeringAxis", 0);
+    cfg.axis_throttle = read_axis(L"ThrottleAxis", 1);
+    cfg.axis_brake = read_axis(L"BrakeAxis", 5);
+    cfg.axis_clutch = read_axis(L"ClutchAxis", 6);
+    cfg.btn_a = read_int(L"ButtonA", 0);
+    cfg.btn_b = read_int(L"ButtonB", 1);
+    cfg.btn_x = read_int(L"ButtonX", 2);
+    cfg.btn_y = read_int(L"ButtonY", 3);
+    cfg.btn_paddle_right = read_int(L"PaddleRight", 4);
+    cfg.btn_paddle_left = read_int(L"PaddleLeft", 5);
+    cfg.btn_menu = read_int(L"ButtonMenu", 6);
+    cfg.btn_view = read_int(L"ButtonView", 7);
+    cfg.shifter = read_int(L"Shifter", 0);
+    static const wchar_t *const gear_keys[7] = {L"Gear1", L"Gear2", L"Gear3", L"Gear4",
+                                                L"Gear5", L"Gear6", L"Reverse"};
     for (int g = 0; g < 7; ++g) cfg.gear[g] = read_int(gear_keys[g], 12 + g);
-    cfg.reverse_value = read_int(L"RueckwaertsWert", 255) & 0xff;
+    cfg.reverse_value = read_int(L"ReverseValue", 255) & 0xff;
     cfg.ffb = read_int(L"ForceFeedback", 1);
-    cfg.lock = read_int(L"Anschlag", cfg.rotation > 0 ? 81000 / cfg.rotation : 90);
+    cfg.lock = read_int(L"Lock", cfg.rotation > 0 ? 81000 / cfg.rotation : 90);
     if (cfg.lock < 30 || cfg.lock > 450) cfg.lock = 450;
-    cfg.centering = read_int(L"Zentrierung", 20);
-    cfg.damping = read_int(L"Daempfung", 10);
-    cfg.ffb_csv = read_int(L"FFBProtokoll", 1);
-    cfg.strength = read_int(L"FFBStaerke", 100);
-    cfg.rumble = read_int(L"Vibration", 100);
-    cfg.ffb_sign = read_int(L"FFBRichtung", 0); /* 0 = automatisch, 1 / -1 = fest */
-    cfg.curve10 = read_int(L"Kurve", 10);        /* 10 = linear, 30 = Mitte dreimal so direkt */
+    cfg.centering = read_int(L"Centering", 20);
+    cfg.damping = read_int(L"Damping", 10);
+    cfg.ffb_csv = read_int(L"FFBLog", 1);
+    cfg.strength = read_int(L"FFBStrength", 100);
+    cfg.rumble = read_int(L"Rumble", 100);
+    cfg.ffb_sign = read_int(L"FFBDirection", 0); /* 0 = automatisch, 1 / -1 = fest */
+    cfg.curve10 = read_int(L"Curve", 10);        /* 10 = linear, 30 = Mitte dreimal so direkt */
     if (cfg.curve10 < 10 || cfg.curve10 > 60) cfg.curve10 = 10;
-    cfg.outward = read_int(L"KraftNachAussen", 30); /* % der Kraft, die vom Mittelpunkt wegzieht */
-    cfg.smoothing = read_int(L"Glaettung", 35);     /* ms Glaettung der Spielkraft (Schlaege gehen durch) */
-    cfg.friction = read_int(L"Reibung", 4);         /* % Lenkungsreibung */
-    cfg.minforce = read_int(L"Mindestkraft", 2);    /* % gegen die tote Zone des G920-Getriebes */
-    cfg.ffb_mode = read_int(L"FFBModus", 0) == 1 ? 1 : 0;
+    cfg.outward = read_int(L"OutwardForce", 30); /* % der Kraft, die vom Mittelpunkt wegzieht */
+    cfg.smoothing = read_int(L"Smoothing", 35);     /* ms Glaettung der Spielkraft (Schlaege gehen durch) */
+    cfg.friction = read_int(L"Friction", 4);         /* % Lenkungsreibung */
+    cfg.minforce = read_int(L"MinimumForce", 2);    /* % gegen die tote Zone des G920-Getriebes */
+    cfg.ffb_mode = read_int(L"FFBMode", 0) == 1 ? 1 : 0;
     cfg.log = read_int(L"Log", 1);
     cfg.wheel_dll = read_int(L"WheelDll", 1);
     /* free wheel buttons: G920 RSB = 8, LSB = 9, Xbox button = 10 (DirectInput numbers) */
-    static const wchar_t *const extra_keys[WHEEL_EXTRA_BUTTONS] = {L"ZusatzTaste1", L"ZusatzTaste2",
-                                                                   L"ZusatzTaste3"};
+    static const wchar_t *const extra_keys[WHEEL_EXTRA_BUTTONS] = {L"ExtraButton1", L"ExtraButton2",
+                                                                   L"ExtraButton3"};
     static const wchar_t *const function_keys[WHEEL_EXTRA_BUTTONS] = {
-        L"ZusatzFunktion1", L"ZusatzFunktion2", L"ZusatzFunktion3"};
+        L"ExtraFunction1", L"ExtraFunction2", L"ExtraFunction3"};
     static const int extra_defaults[WHEEL_EXTRA_BUTTONS] = {8, 9, 10};
     static const int function_defaults[WHEEL_EXTRA_BUTTONS] = {WHEEL_FUNCTION_LOOK_BACK,
                                                                WHEEL_FUNCTION_CAMERA,
@@ -439,7 +449,7 @@ static void config_load(void) {
         if (cfg.extra_function[k] < 0 || cfg.extra_function[k] >= WHEEL_FUNCTION_COUNT)
             cfg.extra_function[k] = function_defaults[k];
     }
-    GetPrivateProfileStringW(L"Lenkrad", L"Geraet", L"", cfg.device, 128, ini_path);
+    GetPrivateProfileStringW(L"Wheel", L"Device", L"", cfg.device, 128, ini_path);
 }
 
 /* ------------------------------------------------------------------ live settings (in-game menu) */
@@ -2045,7 +2055,7 @@ static void csv_write(const JoyState *s, ULONGLONG now) {
             if (log_path[n] == L'\\' || log_path[n] == L'/') slash = n + 1;
         }
         path[slash] = 0;
-        if (!path_join(path, path, L"FH2_Lenkrad_ffb.csv")) return;
+        if (!path_join(path, path, L"FH2_Wheel_ffb.csv")) return;
         csv_file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (csv_file == INVALID_HANDLE_VALUE) {
             csv_file = NULL;
@@ -2433,7 +2443,7 @@ static void bridge_setup_inner(void) {
     game_create_string = (CreateStringFn)game_import("combase.dll", "WindowsCreateString");
     soft_wheel = 0;
     if (!cfg.wheel_dll) {
-        wlog("WheelDll=0 in FH2_Lenkrad.ini: die Mod nutzt ihre eigene Lenkrad-Umsetzung.");
+        wlog("WheelDll=0 in FH2_Wheel.ini: die Mod nutzt ihre eigene Lenkrad-Umsetzung.");
     } else if (GetFileAttributesW(dll_path) == INVALID_FILE_ATTRIBUTES) {
         wlog("Hinweis: %S fehlt in diesem Spiel - kein Problem, die Mod nutzt ihre eigene Lenkrad-Umsetzung.",
              dll_path);
@@ -2468,8 +2478,8 @@ static void bridge_setup_inner(void) {
     if (thread) CloseHandle(thread);
     wheel_ready = 1;
     wlog("Lenkrad-Bruecke bereit (ID %X%X).", (unsigned)(WHEEL_ID >> 32), (unsigned)WHEEL_ID);
-    log_append(soft_wheel ? "WHEEL: Lenkrad-Bruecke aktiv (eigene Wheel-Umsetzung) - Details in FH2_Lenkrad.log.\r\n"
-                          : "WHEEL: Lenkrad-Bruecke aktiv - Details in FH2_Lenkrad.log.\r\n");
+    log_append(soft_wheel ? "WHEEL: Lenkrad-Bruecke aktiv (eigene Wheel-Umsetzung) - Details in FH2_Wheel.log.\r\n"
+                          : "WHEEL: Lenkrad-Bruecke aktiv - Details in FH2_Wheel.log.\r\n");
     return;
 }
 
@@ -2558,17 +2568,17 @@ void wheel_bridge_start(unsigned char *game_image, const wchar_t *executable_pat
     config_load();
     live_load();
     log_enabled = 1;
-    {   /* keep the previous session's log as FH2_Lenkrad_vorher.log */
+    {   /* keep the previous session's log as FH2_Wheel_previous.log */
         static wchar_t old_path[PATH_CAPACITY];
-        if (path_join(old_path, settings_directory, L"FH2_Lenkrad_vorher.log"))
+        if (path_join(old_path, settings_directory, L"FH2_Wheel_previous.log"))
             MoveFileExW(log_path, old_path, MOVEFILE_REPLACE_EXISTING);
     }
     HANDLE file = CreateFileW(log_path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
-    wlog("FH2 Lenkrad-Bruecke (inoffiziell) v0.1 - Aktiv=%d Drehwinkel=%d Schaltknauf=%d", cfg.enabled, cfg.rotation,
+    wlog("FH2 Lenkrad-Bruecke (inoffiziell) v0.1 - Enabled=%d Rotation=%d Shifter=%d", cfg.enabled, cfg.rotation,
          cfg.shifter);
     if (!cfg.enabled) {
-        wlog("Ausgeschaltet in FH2_Lenkrad.ini.");
+        wlog("Ausgeschaltet in FH2_Wheel.ini (Enabled=0).");
         return;
     }
     wlog("Zusatztasten: Taste %d -> Funktion %d, Taste %d -> Funktion %d, Taste %d -> Funktion %d.",

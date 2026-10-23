@@ -175,6 +175,23 @@ int ini_find_int(const char *text, size_t length, const char *section, const cha
     return 1;
 }
 
+int ini_find_text(const char *text, size_t length, const char *section, const char *key,
+                  char *value, size_t capacity) {
+    Location where;
+    locate(text, length, section, key, &where);
+    if (!where.found_key || !capacity) {
+        return 0;
+    }
+    size_t p = where.equals + 1, e = where.key_line_end;
+    trim(text, &p, &e);
+    size_t n = 0;
+    while (p < e && n + 1 < capacity) {
+        value[n++] = text[p++];
+    }
+    value[n] = 0;
+    return 1;
+}
+
 typedef struct {
     char *out;
     size_t length, capacity;
@@ -258,6 +275,32 @@ size_t ini_set_value(const char *text, size_t length, const char *section, const
         put_text(&o, value);
         put_text(&o, nl);
     }
+    if (!o.ok) {
+        return 0;
+    }
+    out[o.length] = 0;
+    return o.length;
+}
+
+size_t ini_rename_key(const char *text, size_t length, const char *section, const char *key,
+                      const char *new_key, char *out, size_t capacity) {
+    if (!out || !capacity) {
+        return 0;
+    }
+    Location where;
+    locate(text, length, section, key, &where);
+    if (!where.found_key) {
+        return 0;
+    }
+    Line line = {where.key_line_start, where.key_line_end, 0};
+    size_t a, b, c;
+    if (!key_of(text, &line, &a, &b, &c)) {
+        return 0;
+    }
+    Output o = {out, 0, capacity, 1};
+    put(&o, text, a);
+    put_text(&o, new_key);
+    put(&o, text + b, length - b);
     if (!o.ok) {
         return 0;
     }

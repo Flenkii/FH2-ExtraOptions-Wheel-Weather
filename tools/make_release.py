@@ -6,7 +6,7 @@
 Layout:
     README.txt, Keybindings.txt, LICENSE.txt
     Azimuth/winmm.dll, Azimuth/FH2_ExtraOptions.ini          (required)
-    Optional/Profiles/<name>/FH2_Lenkrad.ini, FH2_Tastatur.ini  (ready-made settings)
+    Optional/Profiles/<name>/FH2_Wheel.ini, FH2_Keyboard.ini  (ready-made settings)
 
 The profile INIs are the mod's own default files (taken from the C sources, so they always match
 the DLL) with a few values changed. No game files are packed."""
@@ -42,15 +42,15 @@ def changed(text, section, values):
     """Sets key=value lines (keys must exist in the file)."""
     for key, value in values.items():
         pattern = re.compile(rf'^({key}=)[^\r\n]*', re.M)
-        assert pattern.search(text), f'{key} fehlt in [{section}]'
+        assert pattern.search(text), f'{key} missing in [{section}]'
         text = pattern.sub(lambda m: m.group(1) + str(value), text, count=1)
     return text
 
 
 PROFILES = {
-    'Controller': ({'Aktiv': 0}, {'Aktiv': 0}),
-    'Keyboard': ({'Aktiv': 0}, {'Aktiv': 1}),
-    'Wheel': ({'Aktiv': 1}, {'Aktiv': 1}),
+    'Controller': ({'Enabled': 0}, {'Enabled': 0}),
+    'Keyboard': ({'Enabled': 0}, {'Enabled': 1}),
+    'Wheel': ({'Enabled': 1}, {'Enabled': 1}),
 }
 
 
@@ -71,9 +71,9 @@ def main():
         add('Azimuth/winmm.dll', dll.read_bytes())
         add('Azimuth/FH2_ExtraOptions.ini', (ROOT / 'release/FH2_ExtraOptions.ini').read_bytes())
         for name, (wheel_values, keyboard_values) in PROFILES.items():
-            add(f'Optional/Profiles/{name}/FH2_Lenkrad.ini', changed(wheel, 'Lenkrad', wheel_values).encode('ascii'))
-            add(f'Optional/Profiles/{name}/FH2_Tastatur.ini',
-                changed(keyboard, 'Tastatur', keyboard_values).encode('ascii'))
+            add(f'Optional/Profiles/{name}/FH2_Wheel.ini', changed(wheel, 'Wheel', wheel_values).encode('ascii'))
+            add(f'Optional/Profiles/{name}/FH2_Keyboard.ini',
+                changed(keyboard, 'Keyboard', keyboard_values).encode('ascii'))
     with zipfile.ZipFile(output) as z:
         for info in z.infolist():
             print(f'{info.file_size:>9}  {info.filename}')

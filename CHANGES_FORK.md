@@ -11,6 +11,7 @@ Fork of https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions – modified in 
 - `features/rig_settings.c/.h` – in-game "Wheel & Traffic" page, traffic presets, saving to the INIs
 - `features/traffic_tunables.c` – higher traffic limits, rush hour all day (live)
 - `features/weather.c/.h` – fixed weather through the game's own weather control
+- `features/ini_migrate.c/.h` – takes the German settings files of fork1-fork3 over into the English ones (fork4)
 - `features/ini_edit.c/.h` – edit INI lines without losing comments
 - `adapters/azimuth_guard.c` – guard against a null pointer while loading under Azimuth
 - `tools/` – Python scripts for the cockpit wheel, More Traffic and traffic variety, `make_release.py`

@@ -22,8 +22,7 @@ root = tempfile.mkdtemp(prefix='eo-menu-')
 for name in ('FH2_Lenkrad.ini', 'FH2_ExtraOptions.ini'):
     shutil.copy(os.path.join(USER, name), os.path.join(root, name))
 os.makedirs(os.path.join(root, 'game'))
-original_wheel = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read()
-original_eo = open(os.path.join(root, 'FH2_ExtraOptions.ini'), 'rb').read()
+german_wheel = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read()
 
 e = Emu(DLL, root)
 
@@ -78,6 +77,23 @@ print('Start')
 r = e.call('Fh2TestRigStart', GAME, exe, directory)
 check(r == 1, f'Extra-Options-INI gelesen und Speicher-Thread gestartet (Ergebnis {r})')
 check(len(e.threads) == 3, f'3 Threads angelegt (Verkehr, Lenkrad-Hook, Speichern): {len(e.threads)}')
+
+# ---- German files of fork1-fork3 -> English ones
+print('Umzug der deutschen INIs (fork1-fork3) in die englischen')
+backup = os.path.join(root, 'FH2_Settings_Backup')
+original_wheel = open(os.path.join(root, 'FH2_Wheel.ini'), 'rb').read()
+original_eo = open(os.path.join(root, 'FH2_ExtraOptions.ini'), 'rb').read()
+w = original_wheel.decode('latin1')
+check(not os.path.exists(os.path.join(root, 'FH2_Lenkrad.ini')) and
+      open(os.path.join(backup, 'FH2_Lenkrad.ini'), 'rb').read() == german_wheel,
+      'alte FH2_Lenkrad.ini unverändert in FH2_Settings_Backup')
+check('[Wheel]' in w and 'Lenkrad]' not in w and 'Rotation=180' in w and 'FFBStrength=75' in w and 'Rumble=50' in w
+      and 'Lock=450' in w and 'Smoothing=35' in w and 'Curve=30' in w and 'BrakeAxis=Rz' in w,
+      'FH2_Wheel.ini: englisch, deine Werte übernommen (auch versteckte wie Lock/Curve)')
+check('Clutch pedal as brake' in w and 'Aktiv' not in w and 'Drehwinkel' not in w, 'englische Kommentare, keine deutschen Schlüssel')
+check(b'Weather=0' in original_eo and b'Wetter=' not in original_eo and
+      open(os.path.join(backup, 'FH2_ExtraOptions.ini'), 'rb').read().count(b'Wetter=0') == 1,
+      'FH2_ExtraOptions.ini: Wetter= -> Weather= (Kopie im Backup)')
 
 # ---- XAML
 print('XAML (HUD-Seite, echte Spieldatei)')
@@ -176,7 +192,7 @@ got = [get(i) for i in range(20)]
 check(got == expect, f'Startwerte aus deinen INIs (FFB-Art Spiel neu): {got}')
 check(get(PROFILE) == 1, f'Profil beim Start: Mein Setup erkannt ({get(PROFILE)})')
 kb = [get(i) for i in range(KEY_ENABLED, KEY_PEDAL + 1)]
-check(kb == [1, 150.0, 90.0, 60.0], f'Tastatur-Startwerte (FH2_Tastatur.ini neu angelegt): {kb}')
+check(kb == [1, 150.0, 90.0, 60.0], f'Tastatur-Startwerte (FH2_Keyboard.ini neu angelegt): {kb}')
 
 ok = set_box(2, 0.85, True); check(ok and get(2) == 0.85, 'FFB-Stärke 75% -> 85%')
 check(get(PROFILE) == 0, 'Profil springt auf Eigene Werte, sobald ein Wert geändert wird')
@@ -236,22 +252,22 @@ set_box(LEVEL, 3, False)
 print('Speichern')
 e.tick += 100
 e.call('Fh2TestRigStep', e.tick)
-check(open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read() == original_wheel, 'nicht sofort gespeichert (wartet 0,6 s nach der letzten Änderung)')
+check(open(os.path.join(root, 'FH2_Wheel.ini'), 'rb').read() == original_wheel, 'nicht sofort gespeichert (wartet 0,6 s nach der letzten Änderung)')
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
-wheel = open(os.path.join(root, 'FH2_Lenkrad.ini'), 'rb').read()
+wheel = open(os.path.join(root, 'FH2_Wheel.ini'), 'rb').read()
 eo = open(os.path.join(root, 'FH2_ExtraOptions.ini'), 'rb').read()
 import difflib
 def diff(a, b):
     return [l for l in difflib.unified_diff(a.decode('latin1').splitlines(), b.decode('latin1').splitlines(), lineterm='', n=0) if l[:1] in '+-' and l[:3] not in ('+++', '---')]
 dw, de = diff(original_wheel, wheel), diff(original_eo, eo)
-print('   FH2_Lenkrad.ini:', dw)
+print('   FH2_Wheel.ini:', dw)
 print('   FH2_ExtraOptions.ini:', de)
-check(sorted(dw) == sorted(['-Drehwinkel=180', '+Drehwinkel=210', '-Schaltknauf=0', '+Schaltknauf=1', '-Anschlag=450', '+Anschlag=440',
-                           '-FFBStaerke=75', '+FFBStaerke=85', '-Vibration=50', '+Vibration=150', '-Glaettung=35', '+Glaettung=40',
-                           '-Kurve=30', '+Kurve=31', '+FFBModus=1']), 'Lenkrad-INI: nur die geänderten Zeilen (+ neue Schlüssel)')
-kbini = open(os.path.join(root, 'FH2_Tastatur.ini'), 'rb').read()
-check(b'Lenkzeit=200' in kbini and b'Maus=' not in kbini and b'Gas=W' in kbini, 'Tastatur-INI: Werte gespeichert, Belegung erhalten')
+check(sorted(dw) == sorted(['-Rotation=180', '+Rotation=210', '-Shifter=0', '+Shifter=1', '-Lock=450', '+Lock=440',
+                           '-FFBStrength=75', '+FFBStrength=85', '-Rumble=50', '+Rumble=150', '-Smoothing=35', '+Smoothing=40',
+                           '-Curve=30', '+Curve=31', '+FFBMode=1']), 'Lenkrad-INI: nur die geänderten Zeilen (+ neue Schlüssel)')
+kbini = open(os.path.join(root, 'FH2_Keyboard.ini'), 'rb').read()
+check(b'SteerTime=200' in kbini and b'Mouse=' not in kbini and b'Throttle=W' in kbini, 'Tastatur-INI: Werte gespeichert, Belegung erhalten')
 check(sorted(de) == sorted(['-TrafficLevel=5', '+TrafficLevel=3']), 'Extra-Options-INI: nur TrafficLevel (Rushhour wieder 0 = unverändert)')
 check(len(eo) <= 8192, f'Extra-Options-INI bleibt unter 8192 Bytes ({len(eo)})')
 check(not any(n.endswith('.eotmp') for n in os.listdir(root)), 'keine Temp-Dateien übrig')
@@ -263,8 +279,8 @@ check(r == 1, 'Extra Options akzeptiert die geänderte INI (Parser von EO selbst
 
 # ---- launcher changes the INI while the game runs
 print('Launcher ändert INI während das Spiel läuft')
-p = os.path.join(root, 'FH2_Lenkrad.ini')
-text = open(p, 'rb').read().replace(b'Schaltknauf=1', b'Schaltknauf=0').replace(b'FFBStaerke=85', b'FFBStaerke=60')
+p = os.path.join(root, 'FH2_Wheel.ini')
+text = open(p, 'rb').read().replace(b'Shifter=1', b'Shifter=0').replace(b'FFBStrength=85', b'FFBStrength=60')
 open(p, 'wb').write(text); e.touch(p)
 pe = os.path.join(root, 'FH2_ExtraOptions.ini')
 eo_text = open(pe, 'rb').read().replace(b'RushHourAllDay=0', b'RushHourAllDay=1')
@@ -287,7 +303,7 @@ e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 w2 = open(p, 'rb').read()
 check(b'\n=' not in w2 and b'Profil' not in w2, 'Profil selbst wird nicht in die INI geschrieben')
-check(b'FFBStaerke=75' in w2 and b'Glaettung=35' in w2, 'Profilwerte gespeichert')
+check(b'FFBStrength=75' in w2 and b'Smoothing=35' in w2, 'Profilwerte gespeichert')
 
 # ---- Verkehrs-Voreinstellung
 print('Verkehrs-Voreinstellung')
@@ -316,13 +332,13 @@ ok = set_box(WEATHER, 6, False); check(not ok and get(WEATHER) == 4, 'Wetter 6 (
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
 pe_now = open(pe, 'rb').read()
-check(b'Wetter=4' in pe_now, 'Wetter in FH2_ExtraOptions.ini gespeichert ([Traffic] Wetter=4)')
+check(b'Weather=4' in pe_now and b'Wetter=' not in pe_now, 'Wetter in FH2_ExtraOptions.ini gespeichert ([Traffic] Weather=4)')
 r = e.call('Fh2TestReadOptions', directory, e.alloc(400))
 check(r == 1, 'Extra Options akzeptiert die INI mit Wetter-Zeile')
 ok = set_box(WEATHER, 0, False)
 e.tick += 700
 e.call('Fh2TestRigStep', e.tick)
-check(ok and b'Wetter=0' in open(pe, 'rb').read(), 'Wetter zurück auf Original gespeichert')
+check(ok and b'Weather=0' in open(pe, 'rb').read(), 'Wetter zurück auf Original gespeichert')
 check(e.call('Fh2TestWeatherManager') == 0, 'ohne Spielwelt: kein WeatherManager, nichts passiert')
 
 # ---- English

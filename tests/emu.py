@@ -219,6 +219,22 @@ class Emu:
         self.touch(b)
         return 1
 
+    def k_CreateDirectoryW(self):
+        p = self.host(self.wstr(self.arg(0)))
+        if os.path.exists(p):
+            return 0
+        os.makedirs(p)
+        return 1
+
+    def k_CopyFileW(self):
+        a, b = self.host(self.wstr(self.arg(0))), self.host(self.wstr(self.arg(1)))
+        if not os.path.exists(a) or (self.arg(2) and os.path.exists(b)):
+            return 0
+        import shutil
+        shutil.copyfile(a, b)
+        self.touch(b)
+        return 1
+
     def k_DeleteFileW(self):
         p = self.host(self.wstr(self.arg(0)))
         if os.path.exists(p):

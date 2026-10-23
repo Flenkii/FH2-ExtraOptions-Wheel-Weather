@@ -59,6 +59,7 @@ COMMON_SOURCES = [
     "features/wheel_bridge.c",
     "features/wheel_soft.c",
     "features/ini_edit.c",
+    "features/ini_migrate.c",
     "features/rig_settings.c",
     "features/wheel_buttons.c",
     "features/weather.c",

@@ -98,8 +98,9 @@ def raw_buffer():
 e.call('Fh2TestKeyboardAsync', e.stub('GetAsyncKeyState', async_key), e.stub('GetForegroundWindow', foreground),
        e.stub('GetWindowThreadProcessId', window_pid), e.stub('WindowsGetStringRawBuffer', raw_buffer))
 e.call('Fh2TestKeyboardSetup', orig, e.put_wstr('C:\\test'))
-ini = open(os.path.join(root, 'FH2_Tastatur.ini'), 'rb').read()
-check(b'Gas=W' in ini and b'Handbremse=Leertaste' in ini and b'Aktiv=1' in ini, 'FH2_Tastatur.ini mit FH5-Belegung angelegt')
+ini = open(os.path.join(root, 'FH2_Keyboard.ini'), 'rb').read()
+check(b'[Keyboard]' in ini and b'Throttle=W' in ini and b'Handbrake=Space' in ini and b'Enabled=1' in ini,
+      'FH2_Keyboard.ini (englisch) mit FH5-Belegung angelegt')
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
 import make_release
 check(make_release.keyboard_ini().encode('ascii') == ini, 'Release-Profile (tools/make_release.py) = genau die Datei, die die DLL anlegt')
@@ -265,8 +266,8 @@ advance(1200)
 check(read()['buttons'] == 4, 'Gamepad wieder da: wird nach 1 s wieder gelesen')
 
 # disabled -> untouched
-p = os.path.join(root, 'FH2_Tastatur.ini')
-text = open(p, 'rb').read().replace(b'Aktiv=1', b'Aktiv=0')
+p = os.path.join(root, 'FH2_Keyboard.ini')
+text = open(p, 'rb').read().replace(b'Enabled=1', b'Enabled=0')
 open(p, 'wb').write(text)
 e2 = KEmu(DLL, root)
 e = e2
@@ -276,7 +277,7 @@ e.call('Fh2TestKeyboardSetup', orig, e.put_wstr('C:\\test'))
 hook = e.call('Fh2TestKeyboardFactoryHook')
 out = e.alloc(8)
 hr = e.call(hook, e.put_wstr('Windows.Gaming.Input.Gamepad'), e.put_bytes(IID_STATICS), out)
-check(e.rq(out) == real_statics, 'Aktiv=0: Azimuth bekommt die echten Gamepads wie vorher')
+check(e.rq(out) == real_statics, 'Enabled=0: Azimuth bekommt die echten Gamepads wie vorher')
 
 print()
 print('ALLE TESTS OK (%d Pruefungen)' % checks[0] if not fails else '%d FEHLER' % len(fails))

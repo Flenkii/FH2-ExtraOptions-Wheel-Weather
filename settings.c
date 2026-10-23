@@ -27,10 +27,11 @@ const SettingDefinition setting_definitions[] = {
     {"Autodrive", "Enabled", "AutodriveEnabled", offsetof(ModOptions, autodrive), SETTING_BOOLEAN},
     SETTING("Traffic", "TrafficLevel", traffic_level, SETTING_TRAFFIC_LEVEL),
     SETTING("Traffic", "RushHourAllDay", traffic_all_day, SETTING_BOOLEAN),
-    SETTING("Traffic", "Wetter", weather, SETTING_WEATHER),
+    SETTING("Traffic", "Weather", weather, SETTING_WEATHER),
 };
 
 static const SettingDefinition legacy_settings[] = {
+    SETTING("Traffic", "Wetter", weather, SETTING_WEATHER), /* fork1/fork2 name of Weather */
     SETTING("Livery", "Enable4K", enable_4k_liveries, SETTING_BOOLEAN),
     SETTING("Livery", "IntermediateMSAA", livery_msaa, SETTING_MSAA),
     SETTING("Livery", "ExtraSupersampling", livery_supersampling, SETTING_BOOLEAN),

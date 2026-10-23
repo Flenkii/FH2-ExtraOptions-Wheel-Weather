@@ -16,8 +16,8 @@ labels: ''
 **Log files** – please attach these files from your Azimuth folder (next to `azimuth.exe`).
 Drag them into this text box, GitHub accepts .log and .ini files:
 - [ ] `FH2_ExtraOptions.log` (always)
-- [ ] `FH2_Lenkrad.log` (wheel problems)
-- [ ] `FH2_Lenkrad.ini` and `FH2_Tastatur.ini` (your settings)
+- [ ] `FH2_Wheel.log` (wheel problems; `FH2_Lenkrad.log` on fork1-fork3)
+- [ ] `FH2_Wheel.ini` and `FH2_Keyboard.ini` (your settings; `FH2_Lenkrad.ini` / `FH2_Tastatur.ini` on fork1-fork3)
 
 The files contain no personal data, only settings and what the mod detected.
 Start the game once, reproduce the problem, close the game, then attach the files.

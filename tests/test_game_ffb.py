@@ -105,7 +105,7 @@ for i, text in enumerate(programs):
     game_call(26, i, *rsp_args)
 check(e.call('Fh2TestGameFfbLoaded') == 8, 'alle 8 Programme des Spiels laufen auf dem PC')
 check(sum(1 for o in originals if o[0] == 'SetProgram') == 8, 'SetProgram geht weiter an die Wheel-DLL (wie vorher)')
-log = open(os.path.join(root, 'FH2_Lenkrad.log'), 'rb').read().decode('latin1')
+log = open(os.path.join(root, 'FH2_Wheel.log'), 'rb').read().decode('latin1')
 check('Spiel-FFB: Programm 1 geladen: TOFL Lt E0 GT E0 L0 E0 ENDN E0 MOV {Torque} Af+' in log, 'Log zeigt die Programme')
 check('Spiel-FFB: Parameter 1 = Torque' in log, 'Log zeigt die Parameter')
 

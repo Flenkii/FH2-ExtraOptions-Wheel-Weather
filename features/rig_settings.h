@@ -3,7 +3,7 @@
 #include "extra_options.h"
 
 /* In-game page "Lenkrad & Verkehr": wheel bridge and More Traffic settings.
-   Values are kept in the units of the INI files (FH2_Lenkrad.ini / FH2_ExtraOptions.ini),
+   Values are kept in the units of the INI files (FH2_Wheel.ini / FH2_ExtraOptions.ini),
    so the launcher keeps reading and writing the very same keys. */
 enum {
     RIG_WHEEL_ENABLED,   /* Aktiv            0/1, next game start */
@@ -28,7 +28,7 @@ enum {
     RIG_TRAFFIC_LEVEL = RIG_WHEEL_COUNT, /* [Traffic] TrafficLevel   0..5 */
     RIG_TRAFFIC_ALL_DAY,                 /* [Traffic] RushHourAllDay 0/1 */
     RIG_WEATHER,                         /* [Traffic] Wetter         0..5 (weather.h) */
-    RIG_KEY_FIRST,                       /* FH2_Tastatur.ini [Tastatur], keyboard_pad.h order */
+    RIG_KEY_FIRST,                       /* FH2_Keyboard.ini [Keyboard], keyboard_pad.h order */
     RIG_KEY_ENABLED = RIG_KEY_FIRST,     /* Aktiv                0/1, next game start */
     RIG_KEY_STEER,                       /* Lenkzeit             ms */
     RIG_KEY_RETURN,                      /* Rueckstellzeit       ms */
