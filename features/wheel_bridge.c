@@ -10,13 +10,15 @@
  * game asks for the Controller statics, the returned object is wrapped and
  * get_Controllers() gets one extra controller. That controller aggregates the
  * game's own Microsoft.Xbox.Input.Wheel.dll (mapped here by a small loader), so
- * every IWheel call is answered by Microsoft's original code. The raw device
+ * every IWheel call is answered by Microsoft's original code. Game copies without
+ * that DLL get the mod's own implementation of the class instead (wheel_soft.c). The raw device
  * reports that the console's input stack would deliver are synthesised from a
  * DirectInput wheel (G920, G29, G923, ...).
  *
  * Nothing on disk is modified. If no wheel is found, the game is left alone. */
 #include "logging.h"
 #include "ffb_vm.h"
+#include "wheel_soft.h"
 #include "rig_settings.h"
 #include "wheel_buttons.h"
 #include "support.h"
@@ -269,6 +271,7 @@ typedef struct {
     int ffb, lock, centering, damping, ffb_csv, strength, rumble, ffb_sign, curve10, outward;
     int smoothing, friction, minforce;
     int ffb_mode; /* 0 = the game's own wheel programs (like on the Xbox), 1 = own FFB (old) */
+    int wheel_dll; /* 1 = use Microsoft.Xbox.Input.Wheel.dll if it exists, 0 = always our own */
     int extra_button[WHEEL_EXTRA_BUTTONS], extra_function[WHEEL_EXTRA_BUTTONS];
     wchar_t device[128];
 } WheelConfig;
@@ -419,6 +422,7 @@ static void config_load(void) {
     cfg.minforce = read_int(L"Mindestkraft", 2);    /* % gegen die tote Zone des G920-Getriebes */
     cfg.ffb_mode = read_int(L"FFBModus", 0) == 1 ? 1 : 0;
     cfg.log = read_int(L"Log", 1);
+    cfg.wheel_dll = read_int(L"WheelDll", 1);
     /* free wheel buttons: G920 RSB = 8, LSB = 9, Xbox button = 10 (DirectInput numbers) */
     static const wchar_t *const extra_keys[WHEEL_EXTRA_BUTTONS] = {L"ZusatzTaste1", L"ZusatzTaste2",
                                                                    L"ZusatzTaste3"};
@@ -1052,24 +1056,10 @@ static HRESULT WINAPI hook_set_parameter(void *self, void *name, float value) {
     return original_set_parameter(self, name, value);
 }
 
-/* Patches the three methods in the Wheel DLL's IWheel method table (our own mapping of it). */
-static void hook_wheel_methods(void) {
-    void *wheel = NULL;
-    if (!wheel_image || ((QIFn)VT(inner)[0])(inner, &IID_Wheel, &wheel) < 0 || !wheel) {
-        wlog("Spiel-FFB: IWheel nicht erreichbar - eigenes FFB wird benutzt.");
-        return;
-    }
-    void **table = VT(wheel);
-    ((RefFn)VT(wheel)[2])(wheel);
-    static const unsigned slots[3] = {SLOT_SET_PROGRAM, SLOT_ADD_PARAMETER, SLOT_SET_PARAMETER};
-    int expected = table == (void **)(wheel_image + WHEEL_VTABLE_RVA);
-    for (unsigned i = 0; i < 3 && expected; ++i)
-        expected = table[slots[i]] == (void *)(wheel_image + wheel_method_rva[i]);
-    raw_buffer = *(RawBufferFn *)(wheel_image + WHEEL_RAWBUFFER_IAT);
-    if (!expected || !raw_buffer) {
-        wlog("Spiel-FFB: unbekannte Wheel-DLL - eigenes FFB wird benutzt.");
-        return;
-    }
+static int soft_wheel; /* 1 = our own wheel object (wheel_soft.c) instead of Microsoft's DLL */
+
+/* Puts the three hooks into an IWheel method table; the previous entries are called on. */
+static void patch_game_ffb(void **table) {
     DWORD old, ignored;
     if (!VirtualProtect(table + SLOT_SET_PROGRAM, (SLOT_SET_PARAMETER - SLOT_SET_PROGRAM + 1) * sizeof(void *),
                         PAGE_READWRITE, &old)) {
@@ -1086,6 +1076,40 @@ static void hook_wheel_methods(void) {
                    &ignored);
     game_ffb_hooked = 1;
     wlog("Spiel-FFB: Lenkrad-Programme des Spiels werden mitgelesen.");
+}
+
+/* Patches the three methods in the IWheel method table: of our own wheel object, or of the
+   Wheel DLL (our own mapping of it). */
+static void hook_wheel_methods(void) {
+    if (soft_wheel) {
+        if (!raw_buffer) {
+            HMODULE m = LoadLibraryExW(L"combase.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+            raw_buffer = m ? (RawBufferFn)(uintptr_t)GetProcAddress(m, "WindowsGetStringRawBuffer") : NULL;
+        }
+        if (!raw_buffer) {
+            wlog("Spiel-FFB: WindowsGetStringRawBuffer fehlt - eigenes FFB wird benutzt.");
+            return;
+        }
+        patch_game_ffb(wheel_soft_wheel_table());
+        return;
+    }
+    void *wheel = NULL;
+    if (!wheel_image || ((QIFn)VT(inner)[0])(inner, &IID_Wheel, &wheel) < 0 || !wheel) {
+        wlog("Spiel-FFB: IWheel nicht erreichbar - eigenes FFB wird benutzt.");
+        return;
+    }
+    void **table = VT(wheel);
+    ((RefFn)VT(wheel)[2])(wheel);
+    static const unsigned slots[3] = {SLOT_SET_PROGRAM, SLOT_ADD_PARAMETER, SLOT_SET_PARAMETER};
+    int expected = table == (void **)(wheel_image + WHEEL_VTABLE_RVA);
+    for (unsigned i = 0; i < 3 && expected; ++i)
+        expected = table[slots[i]] == (void *)(wheel_image + wheel_method_rva[i]);
+    raw_buffer = *(RawBufferFn *)(wheel_image + WHEEL_RAWBUFFER_IAT);
+    if (!expected || !raw_buffer) {
+        wlog("Spiel-FFB: unbekannte Wheel-DLL - eigenes FFB wird benutzt.");
+        return;
+    }
+    patch_game_ffb(table);
 }
 
 /* ------------------------------------------------------------------ vector wrapper */
@@ -2351,6 +2375,46 @@ static BOOL CALLBACK bridge_setup(PINIT_ONCE once, PVOID parameter, PVOID *conte
     return TRUE;
 }
 
+/* The wheel object from Microsoft's Wheel DLL (aggregated by `outer`). 0 = not available. */
+static int create_dll_wheel(void) {
+    if (!load_wheel_dll()) return 0;
+    void *class_name = NULL;
+    {
+        HMODULE m = LoadLibraryExW(L"combase.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        CreateStringFn real_create = m ? (CreateStringFn)(uintptr_t)GetProcAddress(m, "WindowsCreateString") : NULL;
+        if (!real_create || real_create(L"Microsoft.Xbox.Input.Wheel", 26, &class_name) < 0) {
+            wlog("FEHLER: WindowsCreateString (System) nicht verfuegbar.");
+            return 0;
+        }
+    }
+    void *factory = NULL, *controller_factory = NULL;
+    HRESULT hr = wheel_get_factory(class_name, &factory);
+    if (hr < 0 || !factory) {
+        wlog("FEHLER: DllGetActivationFactory %X", (unsigned)hr);
+        return 0;
+    }
+    hr = ((QIFn)VT(factory)[0])(factory, &IID_ControllerFactory, &controller_factory);
+    if (hr < 0 || !controller_factory) {
+        wlog("FEHLER: IControllerFactory %X", (unsigned)hr);
+        return 0;
+    }
+    outer.vtbl = outer_vtbl;
+    hr = ((CreateInstanceFn)VT(controller_factory)[6])(controller_factory, WHEEL_ID, &outer, &inner);
+    if (hr < 0 || !inner) {
+        wlog("FEHLER: Wheel-Objekt nicht erstellt %X", (unsigned)hr);
+        inner = NULL;
+        return 0;
+    }
+    hr = ((QIFn)VT(inner)[0])(inner, &IID_InputHandler, &input_handler);
+    if (hr < 0 || !input_handler) {
+        wlog("FEHLER: IInputHandler %X", (unsigned)hr);
+        inner = NULL;
+        input_handler = NULL;
+        return 0;
+    }
+    return 1;
+}
+
 static void bridge_setup_inner(void) {
     wlog("Spiel fordert Windows.Xbox.Input.Controller an - Bruecke startet.");
     if (!dinput_find()) return;
@@ -2367,38 +2431,27 @@ static void bridge_setup_inner(void) {
     if (crt_module && !GetProcAddress(crt_module, "_calloc_crt")) crt_module = NULL;
     wlog("CRT des Spiels: %s", crt_module ? "geladenes Modul" : "Azimuth-Abbild (mit Ersatzfunktionen)");
     game_create_string = (CreateStringFn)game_import("combase.dll", "WindowsCreateString");
-    if (!load_wheel_dll()) return;
-    void *class_name = NULL;
-    {
-        HMODULE m = LoadLibraryExW(L"combase.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
-        CreateStringFn real_create = m ? (CreateStringFn)(uintptr_t)GetProcAddress(m, "WindowsCreateString") : NULL;
-        if (!real_create || real_create(L"Microsoft.Xbox.Input.Wheel", 26, &class_name) < 0) {
-            wlog("FEHLER: WindowsCreateString (System) nicht verfuegbar.");
+    soft_wheel = 0;
+    if (!cfg.wheel_dll) {
+        wlog("WheelDll=0 in FH2_Lenkrad.ini: die Mod nutzt ihre eigene Lenkrad-Umsetzung.");
+    } else if (GetFileAttributesW(dll_path) == INVALID_FILE_ATTRIBUTES) {
+        wlog("Hinweis: %S fehlt in diesem Spiel - kein Problem, die Mod nutzt ihre eigene Lenkrad-Umsetzung.",
+             dll_path);
+    } else if (!create_dll_wheel()) {
+        wlog("Die Wheel-DLL des Spiels geht nicht - die Mod nutzt ihre eigene Lenkrad-Umsetzung.");
+    }
+    if (!inner) {
+        outer.vtbl = outer_vtbl;
+        WheelSoftEnv env = {make_string};
+        inner = wheel_soft_create(&outer, &env);
+        HRESULT hr = inner ? ((QIFn)VT(inner)[0])(inner, &IID_InputHandler, &input_handler) : E_FAIL;
+        if (hr < 0 || !input_handler) {
+            wlog("FEHLER: eigene Lenkrad-Umsetzung nicht erstellt %X", (unsigned)hr);
+            inner = NULL;
             return;
         }
-    }
-    void *factory = NULL, *controller_factory = NULL;
-    HRESULT hr = wheel_get_factory(class_name, &factory);
-    if (hr < 0 || !factory) {
-        wlog("FEHLER: DllGetActivationFactory %X", (unsigned)hr);
-        return;
-    }
-    hr = ((QIFn)VT(factory)[0])(factory, &IID_ControllerFactory, &controller_factory);
-    if (hr < 0 || !controller_factory) {
-        wlog("FEHLER: IControllerFactory %X", (unsigned)hr);
-        return;
-    }
-    outer.vtbl = outer_vtbl;
-    hr = ((CreateInstanceFn)VT(controller_factory)[6])(controller_factory, WHEEL_ID, &outer, &inner);
-    if (hr < 0 || !inner) {
-        wlog("FEHLER: Wheel-Objekt nicht erstellt %X", (unsigned)hr);
-        inner = NULL;
-        return;
-    }
-    hr = ((QIFn)VT(inner)[0])(inner, &IID_InputHandler, &input_handler);
-    if (hr < 0 || !input_handler) {
-        wlog("FEHLER: IInputHandler %X", (unsigned)hr);
-        return;
+        soft_wheel = 1;
+        wlog("Eigene Lenkrad-Umsetzung aktiv (ohne Microsoft.Xbox.Input.Wheel.dll).");
     }
     ffb_vm_reset(&game_vm);
     hook_wheel_methods();
@@ -2415,7 +2468,8 @@ static void bridge_setup_inner(void) {
     if (thread) CloseHandle(thread);
     wheel_ready = 1;
     wlog("Lenkrad-Bruecke bereit (ID %X%X).", (unsigned)(WHEEL_ID >> 32), (unsigned)WHEEL_ID);
-    log_append("WHEEL: Lenkrad-Bruecke aktiv - Details in FH2_Lenkrad.log.\r\n");
+    log_append(soft_wheel ? "WHEEL: Lenkrad-Bruecke aktiv (eigene Wheel-Umsetzung) - Details in FH2_Lenkrad.log.\r\n"
+                          : "WHEEL: Lenkrad-Bruecke aktiv - Details in FH2_Lenkrad.log.\r\n");
     return;
 }
 
@@ -2553,6 +2607,35 @@ __declspec(dllexport) int Fh2TestGameFfbHook(unsigned char *fake_image, void *fa
     game_ffb_hooked = 0;
     hook_wheel_methods();
     return game_ffb_hooked;
+}
+/* own wheel object (no Wheel DLL): create it like the bridge does and hook the game FFB */
+__declspec(dllexport) void *Fh2TestSoftWheelCreate(void *raw_buffer_fn, void *create_string_fn) {
+    game_create_string = (CreateStringFn)create_string_fn;
+    raw_buffer = (RawBufferFn)raw_buffer_fn;
+    outer.vtbl = outer_vtbl;
+    WheelSoftEnv env = {make_string};
+    inner = wheel_soft_create(&outer, &env);
+    input_handler = NULL;
+    if (((QIFn)VT(inner)[0])(inner, &IID_InputHandler, &input_handler) < 0) return NULL;
+    soft_wheel = 1;
+    ffb_vm_reset(&game_vm);
+    game_ffb_hooked = 0;
+    hook_wheel_methods();
+    return game_ffb_hooked ? &outer : NULL;
+}
+/* sends the static configuration and one report: DirectInput buttons (bit n = button n), axes */
+__declspec(dllexport) void Fh2TestSoftWheelInput(unsigned buttons, unsigned steer, unsigned throttle) {
+    send_static_config();
+    JoyState s;
+    zero(&s, sizeof(s));
+    s.pov = 0xffffffff;
+    for (int i = 0; i < 32; ++i)
+        if (buttons & (1u << i)) s.buttons[i] = 0x80;
+    if (cfg.axis_steer >= 0) s.axis[cfg.axis_steer] = (LONG)steer;
+    if (cfg.axis_throttle >= 0) s.axis[cfg.axis_throttle] = (LONG)throttle;
+    unsigned char packet[0x14 + 0x11];
+    build_report(&s, packet);
+    ((OnInputFn)VT(input_handler)[6])(input_handler, sizeof(packet), packet);
 }
 __declspec(dllexport) unsigned Fh2TestGameFfbTick(float position) {
     float af = ffb_vm_tick(&game_vm, position);

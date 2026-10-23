@@ -4,6 +4,7 @@ Fork of https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions – modified in 
 
 ## New files
 - `features/wheel_bridge.c` – G920 wheel as an Xbox wheel, force feedback (the game's own wheel programs; the old own FFB only as fallback), reconnect, log
+- `features/wheel_soft.c/.h` - own implementation of the Xbox wheel class, used when the game copy has no `Microsoft.Xbox.Input.Wheel.dll`
 - `features/ffb_vm.c/.h` – runs FH2's own Xbox wheel force-feedback programs on the PC
 - `features/keyboard_pad.c/.h` – keyboard as a gamepad (merged with real gamepads)
 - `features/wheel_buttons.c/.h` – assignable wheel buttons

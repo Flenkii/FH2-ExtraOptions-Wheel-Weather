@@ -24,6 +24,8 @@ Without any further steps everything is automatic:
     FH2_Tastatur.ini).
   - A Logitech G920 wheel is detected. Force feedback = the game's original force feedback,
     like on the Xbox.
+    Works even if your game copy has no Microsoft.Xbox.Input.Wheel.dll (the mod then uses
+    its own version of it).
   - While a wheel is plugged in, the game drives with the wheel only. To drive with keyboard
     or controller anyway: set "Wheel: Use Wheel In Game" to Off in the game and restart
     (or unplug the wheel).

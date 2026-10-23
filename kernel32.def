@@ -53,3 +53,5 @@ EXPORTS
     GetFileAttributesExW
     QueryPerformanceCounter
     QueryPerformanceFrequency
+    GetSystemTimeAsFileTime
+    FileTimeToLocalFileTime
