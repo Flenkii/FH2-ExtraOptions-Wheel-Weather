@@ -5,7 +5,8 @@
 
 Layout:
     README.txt, Keybindings.txt, LICENSE.txt
-    Azimuth/winmm.dll, Azimuth/FH2_ExtraOptions.ini          (required)
+    Azimuth/winmm.dll, Azimuth/FH2_ExtraOptions.ini          (normal, without FH2MP)
+    With FH2MP (online)/fh2extra/...                         (the same files for FH2MP)
     Optional/Profiles/<name>/FH2_Wheel.ini, FH2_Keyboard.ini  (ready-made settings)
 
 The profile INIs are the mod's own default files (taken from the C sources, so they always match
@@ -71,6 +72,9 @@ def main():
         add('LICENSE.txt', (ROOT / 'LICENSE').read_bytes())
         add('Azimuth/winmm.dll', dll.read_bytes())
         add('Azimuth/FH2_ExtraOptions.ini', (ROOT / 'release/FH2_ExtraOptions.ini').read_bytes())
+        # same mod for FH2MP (online): its launcher chain-loads Extra Options from fh2extra\
+        add('With FH2MP (online)/fh2extra/winmm.dll', dll.read_bytes())
+        add('With FH2MP (online)/fh2extra/FH2_ExtraOptions.ini', (ROOT / 'release/FH2_ExtraOptions.ini').read_bytes())
         for name, (wheel_values, keyboard_values) in PROFILES.items():
             add(f'Optional/Profiles/{name}/FH2_Wheel.ini', changed(wheel, 'Wheel', wheel_values).encode('ascii'))
             add(f'Optional/Profiles/{name}/FH2_Keyboard.ini',

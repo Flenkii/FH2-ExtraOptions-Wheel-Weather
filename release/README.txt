@@ -36,6 +36,19 @@ Without any further steps everything is automatic:
     Idea: Lancaster.
 
 
+1b. PLAYING ONLINE WITH FH2MP  (folder "With FH2MP (online)")
+-------------------------------------------------------------
+Same mod, other place. FH2MP (github.com/Charelene/FH2MP) puts its own winmm.dll next to
+azimuth.exe and loads Extra Options from the folder fh2extra:
+  - Install FH2MP with its launcher first.
+  - In the FH2MP launcher settings turn OFF the automatic Extra Options install
+    (otherwise it puts the original Extra Options back).
+  - Copy the folder "fh2extra" from "With FH2MP (online)" into your Azimuth folder
+    (replace the files). Your FH2_Wheel.ini / FH2_Keyboard.ini go into fh2extra too.
+Online, traffic and weather come from the session (your settings only apply offline).
+Wheel, keyboard and force feedback work online.
+
+
 2. OPTIONAL: READY-MADE PROFILES  (folder Optional\Profiles)
 -----------------------------------------------------------
 Only needed if you don't want to use the in-game menu. Copy both INI files of a profile
@@ -63,6 +76,8 @@ Known issues:
 ----------------------------------------------------------------------------------------
 DEUTSCH (kurz)
 Die Dateien aus "Azimuth" neben azimuth.exe kopieren (vorher die alte winmm.dll sichern).
+Mit FH2MP (online): Ordner "fh2extra" aus "With FH2MP (online)" in den Azimuth-Ordner kopieren
+und im FH2MP-Launcher die automatische Extra-Options-Installation ausschalten.
 Einstellungen: im Spiel unter Optionen > HUD > ganz unten, oder FH2_Wheel.ini /
 FH2_Keyboard.ini. Alte FH2_Lenkrad.ini/FH2_Tastatur.ini werden automatisch übernommen
 (Originale im Ordner FH2_Settings_Backup). Die Tastatur funktioniert sofort, Belegung siehe
