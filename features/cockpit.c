@@ -492,6 +492,7 @@ static uint32_t bs_get(BitStream *b, uint32_t one) {
 typedef struct {
     uint32_t used, n, tot, hls, hns, nrw, dt, rri, ri;
     uint32_t *sym, *w, *occ;
+    int bad; /* the data drove an index out of the model: stop (V1 script parity: such cars are skipped) */
 } Dec;
 
 static int dec_init(Dec *c, uint32_t alpha, uint32_t uniq) {
@@ -514,6 +515,7 @@ static int dec_init(Dec *c, uint32_t alpha, uint32_t uniq) {
     ri = ri < cap ? ri : cap;
     c->ri = ri < 128 ? 128 : ri;
     c->hls = c->hns = 0;
+    c->bad = 0;
     return 1;
 }
 
@@ -536,6 +538,10 @@ static void dec_decay(Dec *c) {
                 c->hls--;
                 brk = 1;
                 break;
+            }
+            if (c->hls >= c->n) {
+                c->bad = 1;
+                return;
             }
             occ[idx] = occ[c->hls];
             occ[c->hls] = 0;
@@ -585,8 +591,16 @@ static void dec_renorm(Dec *c) {
 }
 
 static uint32_t dec_decode(Dec *c, BitStream *bs, uint32_t alpha) {
+    if (c->bad || c->hls >= c->n || c->hns >= c->n || c->tot == 0) {
+        c->bad = 1;
+        return 0;
+    }
     if (c->tot >= c->nrw) {
         if (c->tot >= c->dt) dec_decay(c);
+        if (c->bad || c->hls >= c->n || c->tot == 0) {
+            c->bad = 1;
+            return 0;
+        }
         dec_renorm(c);
     }
     uint32_t z = bs_peek(bs, ONE), *w = c->w;
@@ -607,9 +621,17 @@ static uint32_t dec_decode(Dec *c, BitStream *bs, uint32_t alpha) {
     if (idx) return c->sym[idx];
     if (c->hls != c->hns && bs_get(bs, 2)) {
         idx = bs_get(bs, c->hls - c->hns) + c->hns + 1;
+        if (idx >= c->n) {
+            c->bad = 1;
+            return 0;
+        }
         c->occ[idx] += 2;
         c->tot += 2;
         return c->sym[idx];
+    }
+    if (c->hls + 1 >= c->n) {
+        c->bad = 1;
+        return 0;
     }
     c->hls++;
     uint32_t s = bs_get(bs, alpha);
@@ -662,20 +684,24 @@ static void decomp_free(Decomp *d) {
 
 static int decomp_step(Decomp *d, BitStream *bs, unsigned char *out, size_t *pos, size_t cap) {
     uint32_t lc = dec_decode(&d->ln[d->last], bs, 65);
-    if (lc > 64) return 0;
+    if (lc > 64 || d->ln[d->last].bad) return 0;
     d->last = lc;
     if (!lc) {
         if (*pos >= cap) return 0;
-        out[(*pos)++] = (unsigned char)dec_decode(&d->lit[d->n & 3], bs, d->la);
+        Dec *lit = &d->lit[d->n & 3];
+        uint32_t v = dec_decode(lit, bs, d->la);
+        if (lit->bad) return 0;
+        out[(*pos)++] = (unsigned char)v;
         d->n++;
         return 1;
     }
     uint32_t len = replen[lc], ew = d->win < d->n ? d->win : d->n;
     uint32_t o1 = dec_decode(&d->o1, bs, d->o1a) + 1;
     uint32_t o1k = dec_decode(&d->o1k, bs, ew / 1024 + 1);
-    if (o1k > 255) return 0;
+    if (o1k > 255 || d->o1.bad || d->o1k.bad) return 0;
     uint32_t o4a = ew / 4 + 1 < 256 ? ew / 4 + 1 : 256;
     uint32_t o4 = dec_decode(&d->o4[o1k], bs, o4a);
+    if (d->o4[o1k].bad) return 0;
     size_t off = (size_t)o1k * 1024 + o4 * 4 + o1;
     d->n += len;
     if (off > *pos || len > cap - *pos) return 0;
