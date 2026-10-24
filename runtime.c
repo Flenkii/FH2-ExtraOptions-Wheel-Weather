@@ -98,6 +98,7 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
         keyboard_pad_game_start(game_image, settings_directory);
         nitro_link_start(game_image);
         notify_set_enabled(options.notifications);
+        rig_settings_gripline(options.notifications, options.steering_animation);
         rig_settings_start(settings_directory);
     }
     if (initialized && options.enabled) {

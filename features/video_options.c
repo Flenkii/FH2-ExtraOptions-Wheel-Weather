@@ -451,6 +451,13 @@ static void **get_resource(void *reader, void **output) {
                                "<local:FZMaterial ImageSource=\"{Binding SelectedItem.LogoPath, "
                                "ElementName=UpgradePartList}\"")
             : NULL;
+    if (!logo && original && original->bytes && original->length > 0 &&
+        text_find(original->bytes, (size_t)original->length, GRIPLINE_PAGE_MARKER)) {
+        /* Gripline tile page (platform_link.c): same page type as the HUD page, only the
+           properties have to be there - the XAML stays as the platform wrote it */
+        if (!register_properties(HUD_PAGE)) log_append("SETTINGS: Gripline page without settings.\r\n");
+        return output;
+    }
     if (!original || original->length <= 0 || original->length > (int)(XAML_LIMIT / 2) ||
         !original->bytes || (!logo && !video_options_is_xaml(original->bytes, original->length))) {
         return output;

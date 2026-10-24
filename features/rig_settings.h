@@ -35,7 +35,11 @@ enum {
     RIG_KEY_RETURN,                      /* Rueckstellzeit       ms */
     RIG_KEY_PEDAL,                       /* Pedalzeit            ms */
     RIG_KEY_END,
-    RIG_WHEEL_PROFILE = RIG_KEY_END,     /* FFB profile: not stored, derived from the FFB values */
+    RIG_GRIP_FIRST = RIG_KEY_END,        /* FH2_ExtraOptions.ini [Gripline] */
+    RIG_GRIP_NOTIFICATIONS = RIG_GRIP_FIRST, /* Notifications      0/1 */
+    RIG_GRIP_STEERING,                   /* SteeringAnimation  0/1, next game start */
+    RIG_GRIP_END,
+    RIG_WHEEL_PROFILE = RIG_GRIP_END,     /* FFB profile: not stored, derived from the FFB values */
     RIG_TRAFFIC_PRESET,                  /* traffic preset: not stored, derived from level + rush hour */
     RIG_SETTING_COUNT
 };
@@ -76,6 +80,8 @@ int rig_setting_get(unsigned id);
 /* Returns 1 when the value changed. Out-of-range values are refused. */
 int rig_setting_set(unsigned id, int value);
 void rig_settings_start(const wchar_t *settings_directory);
+/* [Gripline] values read from FH2_ExtraOptions.ini at the game start */
+void rig_settings_gripline(int notifications, int steering_animation);
 void rig_settings_flush(void);
 
 /* Texts of the page (German or English, following the game language). */

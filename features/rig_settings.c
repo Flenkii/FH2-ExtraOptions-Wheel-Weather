@@ -17,10 +17,12 @@
 #include "video_options_text.h"
 #include "wheel_buttons.h"
 #include "keyboard_pad.h"
+#include "notify.h"
 
 #define WHEEL_SECTION "Wheel"
 #define TRAFFIC_SECTION "Traffic"
 #define KEYBOARD_SECTION "Keyboard"
+#define GRIPLINE_SECTION "Gripline"
 #define EO_INI_LIMIT 8192u
 #define FILE_LIMIT 16384u
 #define SAVE_DELAY_MS 600u
@@ -73,6 +75,8 @@ static const RigSettingInfo infos[RIG_SETTING_COUNT] = {
     [RIG_KEY_RETURN] = {"EoKeyReturn", "ReturnTime", 0, 1000, RIG_KIND_NUMBER, 0, 1,
                         "EO_KeyTime"},
     [RIG_KEY_PEDAL] = {"EoKeyPedal", "PedalTime", 0, 1000, RIG_KIND_NUMBER, 0, 1, "EO_KeyTime"},
+    [RIG_GRIP_NOTIFICATIONS] = {"EoGripNotify", "Notifications", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
+    [RIG_GRIP_STEERING] = {"EoGripSteering", "SteeringAnimation", 0, 1, RIG_KIND_TOGGLE, 0, 1, NULL},
 };
 
 /* Rows of the menu. The force feedback is the game's own (its wheel programs), so the old
@@ -86,6 +90,7 @@ static const unsigned char order[] = {
     RIG_WHEEL_ROTATION,  RIG_WHEEL_CLUTCH_BRAKE, RIG_WHEEL_BUTTON1, RIG_WHEEL_BUTTON2,  RIG_WHEEL_BUTTON3,
     RIG_KEY_ENABLED,     RIG_KEY_STEER,     RIG_KEY_RETURN,     RIG_KEY_PEDAL,
     RIG_TRAFFIC_PRESET,  RIG_TRAFFIC_LEVEL, RIG_TRAFFIC_ALL_DAY, RIG_WEATHER,
+    RIG_GRIP_STEERING,   RIG_GRIP_NOTIFICATIONS,
 };
 _Static_assert(sizeof(order) <= RIG_SETTING_COUNT, "menu rows");
 
@@ -275,6 +280,14 @@ static const RigText german[RIG_SETTING_COUNT] = {
     [RIG_KEY_PEDAL] = {"Tastatur: Pedalzeit (ms)",
                        "So lange dauert es bis Vollgas oder Vollbremsung mit W oder S. 0 = sofort. "
                        "Wirkt sofort."},
+    [RIG_GRIP_STEERING] = {"Cockpit: Volle Lenkrad-Animation",
+                           "Im Cockpit sind die Hände ausgeblendet und das Lenkrad dreht so weit "
+                           "wie dein echtes (Drehwinkel). Aus = Original-Hände und -Lenkrad. Wirkt "
+                           "nach einem Neustart des Spiels."},
+    [RIG_GRIP_NOTIFICATIONS] = {"Gripline: Benachrichtigungen",
+                                "Kleine Gripline-Karten oben rechts im Bild, z. B. wenn etwas "
+                                "gespeichert wurde oder Nitro online aus ist. Auch im Vollbild. "
+                                "Wirkt sofort."},
 };
 
 static const RigText english[RIG_SETTING_COUNT] = {
@@ -375,6 +388,14 @@ static const RigText english[RIG_SETTING_COUNT] = {
     [RIG_KEY_PEDAL] = {"Keyboard: Pedal Time (ms)",
                        "Time to full throttle or full brake with W or S. 0 = instant. Applies "
                        "immediately."},
+    [RIG_GRIP_STEERING] = {"Cockpit: Full Steering Animation",
+                           "In the cockpit the hands are hidden and the steering wheel turns as "
+                           "far as your real one (rotation). Off = original hands and wheel. "
+                           "Restart the game to apply."},
+    [RIG_GRIP_NOTIFICATIONS] = {"Gripline: Notifications",
+                                "Small Gripline cards at the top right of the picture, e.g. when "
+                                "something was saved or nitro is off online. Also in fullscreen. "
+                                "Applies immediately."},
 };
 
 static const wchar_t *const profile_german[RIG_PROFILE_COUNT] = {
@@ -458,13 +479,24 @@ const wchar_t *rig_traffic_choice(unsigned char *game_image, unsigned index) {
 /* ------------------------------------------------------------------ values */
 
 static wchar_t traffic_ini[PATH_CAPACITY];
-static volatile LONG64 dirty_wheel, dirty_traffic, dirty_keyboard;
+static volatile LONG64 dirty_wheel, dirty_traffic, dirty_keyboard, dirty_gripline;
 static volatile ULONGLONG save_after;
 static SRWLOCK file_lock = SRWLOCK_INIT;
 static int started;
 
 static int is_keyboard(unsigned id) {
     return id >= RIG_KEY_FIRST && id < RIG_KEY_END;
+}
+
+static int is_gripline(unsigned id) {
+    return id >= RIG_GRIP_FIRST && id < RIG_GRIP_END;
+}
+
+static volatile LONG gripline_values[RIG_GRIP_END - RIG_GRIP_FIRST] = {1, 0};
+
+void rig_settings_gripline(int notifications, int steering_animation) {
+    gripline_values[RIG_GRIP_NOTIFICATIONS - RIG_GRIP_FIRST] = notifications ? 1 : 0;
+    gripline_values[RIG_GRIP_STEERING - RIG_GRIP_FIRST] = steering_animation ? 1 : 0;
 }
 
 static int stored_value(unsigned id) {
@@ -474,6 +506,9 @@ static int stored_value(unsigned id) {
     if (is_keyboard(id)) {
         return keyboard_setting(id - RIG_KEY_FIRST);
     }
+    if (is_gripline(id)) {
+        return (int)gripline_values[id - RIG_GRIP_FIRST];
+    }
     return id == RIG_WEATHER ? weather_setting() : traffic_setting(id);
 }
 
@@ -482,7 +517,8 @@ static int is_wheel(unsigned id) {
 }
 
 static volatile LONG64 *dirty_mask(unsigned id) {
-    return is_wheel(id) ? &dirty_wheel : is_keyboard(id) ? &dirty_keyboard : &dirty_traffic;
+    return is_wheel(id) ? &dirty_wheel : is_keyboard(id) ? &dirty_keyboard
+           : is_gripline(id) ? &dirty_gripline : &dirty_traffic;
 }
 
 int rig_setting_get(unsigned id) {
@@ -511,6 +547,15 @@ static void forward(unsigned id, int value) {
         wheel_bridge_set_setting(id, value);
     } else if (is_keyboard(id)) {
         keyboard_set_setting(id - RIG_KEY_FIRST, value);
+    } else if (is_gripline(id)) {
+        LONG before = InterlockedExchange(&gripline_values[id - RIG_GRIP_FIRST], value);
+        if (id == RIG_GRIP_NOTIFICATIONS) {
+            notify_set_enabled(value);
+            if (value && !before) notify_show("Notifications on");
+        } else if (before != value) {
+            notify_show(value ? "Steering animation on\nApplies after a restart"
+                              : "Steering animation off\nApplies after a restart");
+        }
     } else {
         if (id == RIG_WEATHER) {
             weather_set_setting(value);
@@ -631,12 +676,14 @@ typedef struct {
     int error_logged;
 } RigFile;
 
-static RigFile files[3] = {
+static RigFile files[4] = {
     {NULL, WHEEL_SECTION, 0, RIG_WHEEL_COUNT, FILE_LIMIT, 1, 0, "FH2_Wheel.ini", 0},
     /* never create the Extra Options INI: its absence means "all defaults" */
     {traffic_ini, TRAFFIC_SECTION, RIG_TRAFFIC_LEVEL, RIG_WEATHER + 1, EO_INI_LIMIT, 0, 0,
      "FH2_ExtraOptions.ini", 0},
     {NULL, KEYBOARD_SECTION, RIG_KEY_FIRST, RIG_KEY_END, FILE_LIMIT, 1, 0, "FH2_Keyboard.ini", 0},
+    {traffic_ini, GRIPLINE_SECTION, RIG_GRIP_FIRST, RIG_GRIP_END, EO_INI_LIMIT, 0, 0,
+     "FH2_ExtraOptions.ini", 0},
 };
 
 static void log_line(const char *first, const char *second);
@@ -740,8 +787,9 @@ static ULONGLONG last_check;
 
 static void saver_step(ULONGLONG now) {
     AcquireSRWLockExclusive(&file_lock);
-    if ((dirty_wheel || dirty_traffic || dirty_keyboard) && now >= save_after) {
-        volatile LONG64 *masks[3] = {&dirty_wheel, &dirty_traffic, &dirty_keyboard};
+    volatile LONG64 *masks[4] = {&dirty_wheel, &dirty_traffic, &dirty_keyboard, &dirty_gripline};
+    _Static_assert(ARRAY_COUNT(files) == 4, "one dirty mask per file");
+    if ((dirty_wheel || dirty_traffic || dirty_keyboard || dirty_gripline) && now >= save_after) {
         for (unsigned i = 0; i < ARRAY_COUNT(files); ++i) {
             LONG64 dirty = InterlockedExchange64(masks[i], 0);
             if (!save_file(&files[i], dirty)) {
@@ -754,7 +802,7 @@ static void saver_step(ULONGLONG now) {
         last_check = now;
         for (unsigned i = 0; i < ARRAY_COUNT(files); ++i) {
             ULONGLONG time;
-            LONG64 pending = i == 0 ? dirty_wheel : i == 1 ? dirty_traffic : dirty_keyboard;
+            LONG64 pending = *masks[i];
             if (modified_time(files[i].path, &time) && time != files[i].known_time) {
                 files[i].known_time = time;
                 reload_file(&files[i], pending);
@@ -781,6 +829,7 @@ void rig_settings_flush(void) {
     save_file(&files[0], InterlockedExchange64(&dirty_wheel, 0));
     save_file(&files[1], InterlockedExchange64(&dirty_traffic, 0));
     save_file(&files[2], InterlockedExchange64(&dirty_keyboard, 0));
+    save_file(&files[3], InterlockedExchange64(&dirty_gripline, 0));
 }
 
 void rig_settings_start(const wchar_t *settings_directory) {

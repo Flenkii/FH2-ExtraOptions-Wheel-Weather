@@ -3,6 +3,7 @@
 #include "support.h"
 #include "video_options_text.h"
 #include "video_settings.h"
+#include "platform_link.h"
 
 typedef struct {
     const char *property;
@@ -323,12 +324,15 @@ static void append_rig_resources(XamlBuffer *buffer, unsigned char *image) {
     }
 }
 
-static void append_rig_rows(XamlBuffer *buffer, unsigned char *image) {
+static void append_rig_rows(XamlBuffer *buffer, unsigned char *image, int name_first) {
     for (unsigned position = 0; position < rig_setting_menu_count(); ++position) {
         unsigned id = rig_setting_order(position);
         const RigSettingInfo *info = rig_setting_info(id);
+        const char *name = name_first && position == 0 ? " x:Name=\"FirstItem\"" : "";
         if (rig_kind_is_choice(info->kind)) {
-            append_text(buffer, "<local:SpinnerControl Tag=\"{StaticResource EO_");
+            append_text(buffer, "<local:SpinnerControl");
+            append_text(buffer, name);
+            append_text(buffer, " Tag=\"{StaticResource EO_");
             append_text(buffer, info->property);
             append_text(buffer, "}\" Style=\"{StaticResource A_Style_SpinnerControl_Default}\" "
                                 "Label=\"");
@@ -339,7 +343,9 @@ static void append_rig_rows(XamlBuffer *buffer, unsigned char *image) {
             append_text(buffer, rig_kind_collection(info->kind));
             append_text(buffer, "}\"/>");
         } else {
-            append_text(buffer, "<Slider Value=\"{Binding ");
+            append_text(buffer, "<Slider");
+            append_text(buffer, name);
+            append_text(buffer, " Value=\"{Binding ");
             append_text(buffer, info->property);
             append_text(buffer, "}\" Tag=\"{StaticResource EO_");
             append_text(buffer, info->property);
@@ -374,13 +380,13 @@ static size_t extend_hud_xaml(unsigned char *image, const char *text, size_t len
             append_resources(&buffer, localized);
             append_fov_resources(&buffer, localized);
             append_settings_resources(&buffer, localized, 4, 9);
-            append_rig_resources(&buffer, image);
+            if (!platform_page_active()) append_rig_resources(&buffer, image);
         }
         if (text + index == end) {
             append_drift_rows(&buffer, localized);
             append_fov_rows(&buffer);
             append_settings_rows(&buffer, localized, 4, 9);
-            append_rig_rows(&buffer, image);
+            if (!platform_page_active()) append_rig_rows(&buffer, image, 0);
         }
         if (text + index == width) {
             append_text(&buffer, "Width=\"1000\"");
@@ -460,4 +466,41 @@ size_t video_options_extend_xaml(unsigned char *game_image, const char *text, si
     }
     output[buffer.length] = 0;
     return buffer.length;
+}
+
+/* ------------------------------------------------------------------ Gripline tile page */
+
+/* The page behind the GRIPLINE tile of the pause menu (FH2 Mod Platform, platform_link.c):
+   the same rows as on the HUD page, bound to the same properties (every platform page is the
+   game's HUD options page loading another file). The marker comment makes get_resource()
+   register Gripline's properties when this page is opened before the HUD page. */
+int video_options_gripline_page(unsigned char *image, char *resources, size_t resources_capacity,
+                                char *content, size_t content_capacity) {
+    XamlBuffer r = {resources, 0, resources_capacity, 1};
+    append_text(&r, GRIPLINE_PAGE_MARKER);
+    append_rig_resources(&r, image);
+    XamlBuffer c = {content, 0, content_capacity, 1};
+    append_text(&c,
+                "<StackPanel Name=\"BasicOptions\" Orientation=\"Vertical\" VerticalAlignment=\"Center\" "
+                "HorizontalAlignment=\"Center\"><StackPanel Orientation=\"Horizontal\" Margin=\"0,0,0,6\" "
+                "Style=\"{StaticResource A_Style_FrameworkElement_DefaultTransition_0}\"><ContentControl "
+                "Tag=\"" GRIPLINE_VERSION "\" Content=\"GRIPLINE\" Style=\"{StaticResource "
+                "A_Style_ContentControl_ScreenTitleBlock}\" Focusable=\"False\"/></StackPanel>"
+                "<StackPanel Orientation=\"Horizontal\" Style=\"{StaticResource "
+                "A_Style_FrameworkElement_DefaultTransition_0}\"><Grid Margin=\"0, 0, 6, 0\" "
+                "local:UIPageTransitionManager.TransitionIndex=\"0\"><local:FZMaterial Color=\""
+                "{StaticResource A_Color_TileSelected_Text}\"><local:CommonListBox x:Name=\"OptionsList\" "
+                "KeyboardNavigation.DirectionalNavigation=\"Contained\" Style=\"{StaticResource "
+                "A_Style_ListBox_List_Default}\" ItemContainerStyle=\"{StaticResource "
+                "A_Style_ListBoxItem_List_Default}\" Width=\"1000\" Height=\"550\" Margin=\"0,0,0,0\" "
+                "HorizontalAlignment=\"Stretch\" VerticalAlignment=\"Stretch\">");
+    append_rig_rows(&c, image, 1);
+    append_text(&c, "</local:CommonListBox></local:FZMaterial></Grid><ContentControl Content=\"{Binding "
+                    "Tag.Description}\" DataContext=\"{Binding SelectedItem, ElementName=OptionsList}\" "
+                    "Style=\"{StaticResource A_Style_DescriptionPanel}\" "
+                    "local:UIPageTransitionManager.TransitionIndex=\"1\"/></StackPanel></StackPanel>");
+    if (!r.valid || !c.valid) return 0;
+    r.bytes[r.length] = 0;
+    c.bytes[c.length] = 0;
+    return 1;
 }

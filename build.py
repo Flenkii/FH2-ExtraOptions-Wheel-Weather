@@ -67,6 +67,7 @@ COMMON_SOURCES = [
     "features/keyboard_pad.c",
     "features/nitro_link.c",
     "features/notify.c",
+    "features/platform_link.c",
 ]
 
 
@@ -185,6 +186,18 @@ def cached_command(command, inputs, target, compiler, rebuild):
     return True
 
 
+def build_platform_mod(compiler, output, directory, arguments, import_library, options):
+    """fh2-mods\\Gripline.dll: hands the FH2 Mod Platform's API to Gripline's winmm.dll."""
+    source = SOURCE / "platform/gripline_mod.c"
+    object_file = directory / "gripline_mod.obj"
+    cached_command([*arguments, str(source), "-o", str(object_file)],
+                   project_dependencies(source), object_file, compiler, options.rebuild)
+    subprocess.run([str(compiler), "lld-link", "/dll", "/entry:DllMain", "/machine:x64",
+                    "/nodefaultlib", "/dynamicbase", "/nxcompat", "/Brepro",
+                    "/out:" + str(output), "/implib:" + str(directory / "gripline_mod.lib"),
+                    str(object_file), str(import_library)], check=True)
+
+
 def build(compiler, output, directory, options):
     started = time.monotonic()
     directory.mkdir(parents=True, exist_ok=True)
@@ -257,6 +270,9 @@ def build(compiler, output, directory, options):
     if options.azimuth:
         link_arguments.append("/def:" + str(SOURCE / "adapters/winmm_exports.def"))
     subprocess.run(link_arguments, check=True)
+    if options.azimuth:
+        build_platform_mod(compiler, output.parent / "Gripline.dll", directory, arguments,
+                           import_library, options)
     print(f"Compiled {sum(compiled for _, compiled in results)}/{len(sources)} objects; "
           f"{time.monotonic() - started:.1f}s", flush=True)
 

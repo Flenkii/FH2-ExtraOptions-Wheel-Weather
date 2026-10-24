@@ -11,7 +11,8 @@ fails = []
 # setting ids (rig_settings.h)
 FFB_MODE, CLUTCH_BRAKE, LEVEL, ALLDAY, WEATHER = 17, 18, 19, 20, 21
 KEY_ENABLED, KEY_STEER, KEY_RETURN, KEY_PEDAL = 22, 23, 24, 25
-PROFILE, PRESET = 26, 27
+PROFILE, PRESET = 28, 29
+GRIP_NOTIFY, GRIP_STEERING = 26, 27
 
 def check(cond, text):
     print(('  ok   ' if cond else '  FAIL ') + text)
@@ -117,7 +118,7 @@ open(os.path.join(tempfile.gettempdir(), 'hud_de.xaml'), 'wb').write(hud)
 props = ['EoRigWheelEnabled', 'EoRigForceFeedback', 'EoRigStrength', 'EoRigRumble', 'EoRigRotation',
          'EoRigClutchBrake', 'EoRigButton1', 'EoRigButton2', 'EoRigButton3', 'EoKeyEnabled', 'EoKeySteer',
          'EoKeyReturn', 'EoKeyPedal', 'EoRigDensity',
-         'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather']
+         'EoRigTrafficLevel', 'EoRigRushHour', 'EoRigWeather', 'EoGripSteering', 'EoGripNotify']
 hidden = ['EoRigFfbMode', 'EoRigProfile', 'EoRigDamping', 'EoRigFriction', 'EoRigSmoothing', 'EoRigMinimumForce',
           'EoRigOutward', 'EoRigCentering', 'EoRigLock', 'EoRigCurve', 'EoRigShifter']
 if dom:
