@@ -15,4 +15,7 @@ enum { NITRO_SOURCE_KEYBOARD = 1, NITRO_SOURCE_WHEEL = 2 };
    FnFNitro.dll (at most once per second) and links to it. */
 void nitro_link_set(unsigned source, int held);
 
+/* Game mapped: enables the online check (nitro is switched off in an FH2MP session). */
+void nitro_link_start(unsigned char *game_image);
+
 #endif

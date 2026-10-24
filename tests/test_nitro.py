@@ -109,5 +109,37 @@ e.call('Fh2TestNitroSet', 1, 1)
 check(poll()[1] == 0x1100, 'unknown name: LB like NitroSystem')
 e.call('Fh2TestNitroSet', 1, 0)
 
+print('online (FH2MP session):')
+NET = 0x140000000 + 0x36e24f8
+conn = e.alloc(0x40)
+e.wq(NET, conn)
+e.wd(conn + 0x10, 0)
+e.call('Fh2TestNitroGame', 0x140000000)
+open(ini, 'w').write('[Settings]\r\nNitroButton=LB\r\n')
+e.tick += 2500
+e.call('Fh2TestNitroSet', 1, 1)
+pad['buttons'] = 0x1000
+check(poll()[1] == 0x1100, 'connection state 0 (offline): nitro works')
+e.wd(conn + 0x10, 1)
+e.tick += 600
+r, b, lt, rt = poll()
+check(r == 0 and b == 0x1000, 'connection state 1 (online): Gripline nitro off (%#x)' % b)
+pad['buttons'] = 0x1100
+check(poll()[1] == 0x1000, 'online: real controller LB hidden from NitroSystem too')
+check(e.call('Fh2TestNotifyCount') >= 1, 'notification shown')
+l1, l2 = e.alloc(200), e.alloc(200)
+e.call('Fh2TestNotifyText', 0, l1, l2)
+check(e.wstr(l1) == 'Nitro off' and 'online' in e.wstr(l2), 'card text: %r / %r' % (e.wstr(l1), e.wstr(l2)))
+e.wd(conn + 0x10, 2)
+e.tick += 600
+pad['buttons'] = 0x1000
+check(poll()[1] == 0x1100, 'offline again: nitro back')
+e.call('Fh2TestNotifyText', 0, l1, l2)
+check(e.wstr(l1) == 'Nitro on again', 'card: nitro on again')
+e.wq(NET, 0)
+e.tick += 600
+check(poll()[1] == 0x1100, 'no connection object: offline')
+e.call('Fh2TestNitroSet', 1, 0)
+
 print('%d checks, %d failed' % (checks[0], len(fails)))
 sys.exit(1 if fails else 0)

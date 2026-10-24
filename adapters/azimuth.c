@@ -6,6 +6,7 @@
 #include "sha256.h"
 #include "support.h"
 #include "features/keyboard_pad.h"
+#include "features/notify.h"
 
 #define LOAD_LIBRARY_IAT 0x2853c0u
 #define TLS_LOADER_RETURN 0xcbb0cu
@@ -304,6 +305,7 @@ void adapter_process_attach(HINSTANCE instance) {
         }
         if (!lstrcmpiW(name, L"azimuth.exe") && directory_from_module(instance, mod_directory)) {
             keyboard_pad_arm((unsigned char *)GetModuleHandleW(NULL), mod_directory);
+            notify_install((unsigned char *)GetModuleHandleW(NULL)); /* game picture cards */
         }
     }
 }

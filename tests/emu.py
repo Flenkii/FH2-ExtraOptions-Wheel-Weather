@@ -268,6 +268,21 @@ class Emu:
         return len(value)
 
     # ------------------------------------------------------------- misc kernel32
+    def k_MultiByteToWideChar(self):
+        src, n, dst, cap = self.arg(2), self.arg(3) & 0xffffffff, self.arg(4), self.arg(5) & 0xffffffff
+        if n == 0xffffffff:
+            raw = b''
+            while self.mu.mem_read(src + len(raw), 1) != b'\0':
+                raw += bytes(self.mu.mem_read(src + len(raw), 1))
+            raw += b'\0'
+        else:
+            raw = bytes(self.mu.mem_read(src, n))
+        w = raw.decode('utf-8', 'replace').encode('utf-16le')
+        if dst and cap:
+            w = w[: cap * 2]
+            self.mu.mem_write(dst, w)
+        return len(w) // 2
+
     def k_GetModuleHandleW(self):
         # other mods' modules (e.g. FnFNitro.dll): name -> base, not loaded = 0
         name = self.wstr(self.arg(0)).lower() if self.arg(0) else ''

@@ -2,6 +2,8 @@
 #include "runtime.h"
 #include "features.h"
 #include "features/keyboard_pad.h"
+#include "features/nitro_link.h"
+#include "features/notify.h"
 #include "features/rig_settings.h"
 #include "features/video_settings.h"
 #include "logging.h"
@@ -94,6 +96,8 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
     if (initialized && options.enabled) {
         wheel_bridge_start(game_image, executable_path, settings_directory);
         keyboard_pad_game_start(game_image, settings_directory);
+        nitro_link_start(game_image);
+        notify_set_enabled(options.notifications);
         rig_settings_start(settings_directory);
     }
     if (initialized && options.enabled) {

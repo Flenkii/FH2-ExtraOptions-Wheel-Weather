@@ -3,6 +3,7 @@
 #include "logging.h"
 #include "support.h"
 #include "nitro_link.h"
+#include "notify.h"
 
 typedef struct {
     DWORD packet;
@@ -24,6 +25,42 @@ static HMODULE linked_module;
 static void *volatile *linked_slot;
 static wchar_t ini_path[PATH_CAPACITY];
 static ULONGLONG next_search, next_ini;
+static unsigned char *game;
+static volatile LONG online_state = -1; /* -1 unknown, 0 offline, 1 online session */
+static ULONGLONG next_online_check;
+
+/* FH2's network connection object (DAT_1436e24f8): its state +0x10 is 1 while a network
+   session is up (the same test the Car Meet uses for "online meet", FUN_1411f73a0). */
+#define NET_CONNECTION_RVA 0x36e24f8u
+
+static int session_online(void) {
+    void *connection = NULL;
+    int state = 0;
+    if (!game || !memory_read(game + NET_CONNECTION_RVA, &connection, sizeof(connection)) || !connection)
+        return 0;
+    if (!memory_read((unsigned char *)connection + 0x10, &state, sizeof(state))) return 0;
+    return state == 1;
+}
+
+/* Online: nitro off (NitroSystem would give an unfair boost to the other players' races). */
+static int nitro_blocked(void) {
+    ULONGLONG now = GetTickCount64();
+    if (now >= next_online_check) {
+        next_online_check = now + 500;
+        LONG online = session_online();
+        LONG before = InterlockedExchange(&online_state, online);
+        if (before != online && (before != -1 || online)) {
+            if (online) {
+                log_append("NITRO: online session - nitro off.\r\n");
+                if (linked_module) notify_show("Nitro off\nReason: online session (FH2MP)");
+            } else {
+                log_append("NITRO: offline again - nitro on.\r\n");
+                if (linked_module) notify_show("Nitro on again\nOffline");
+            }
+        }
+    }
+    return online_state == 1;
+}
 
 static const struct {
     const wchar_t *name;
@@ -70,7 +107,17 @@ static void read_button(void) {
 static DWORD WINAPI linked_get_state(DWORD user, PadState *state) {
     GetStateFn original = original_get_state;
     DWORD result = original ? original(user, state) : 1167; /* ERROR_DEVICE_NOT_CONNECTED */
-    if (user != 0 || !held_sources || !state) return result;
+    if (!state) return result;
+    if (nitro_blocked()) { /* also hide the real controller's NitroButton */
+        if (result == 0) {
+            unsigned blocked = (unsigned)nitro_button;
+            if (blocked == BUTTON_LT) state->left_trigger = 0;
+            else if (blocked == BUTTON_RT) state->right_trigger = 0;
+            else state->buttons = (WORD)(state->buttons & ~blocked);
+        }
+        return result;
+    }
+    if (user != 0 || !held_sources) return result;
     if (result != 0) { /* no XInput pad (wheel / keyboard only): report an idle pad */
         PadState idle = {0};
         *state = idle;
@@ -142,6 +189,7 @@ static int link_module(HMODULE module, const wchar_t *ini) {
     read_button();
     log_append("NITRO: NitroSystem found - Gripline nitro key and wheel button press its "
                "NitroButton.\r\n");
+    notify_show("NitroSystem found\nNitro: N / wheel button");
     return 1;
 }
 
@@ -156,6 +204,10 @@ static void search(void) {
     static wchar_t ini[PATH_CAPACITY];
     if (!path_join(ini, path, L"FnFNitro.ini")) return;
     link_module(module, ini);
+}
+
+void nitro_link_start(unsigned char *game_image) {
+    game = game_image;
 }
 
 void nitro_link_set(unsigned source, int held) {
@@ -184,6 +236,11 @@ __declspec(dllexport) int Fh2TestNitroLink(void *module, const wchar_t *ini) {
 
 __declspec(dllexport) void Fh2TestNitroSet(unsigned source, int held) {
     nitro_link_set(source, held);
+}
+
+__declspec(dllexport) void Fh2TestNitroGame(void *image) {
+    game = (unsigned char *)image;
+    next_online_check = 0;
 }
 
 __declspec(dllexport) void *Fh2TestNitroHook(void) {

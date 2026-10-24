@@ -28,6 +28,8 @@ const SettingDefinition setting_definitions[] = {
     SETTING("Traffic", "TrafficLevel", traffic_level, SETTING_TRAFFIC_LEVEL),
     SETTING("Traffic", "RushHourAllDay", traffic_all_day, SETTING_BOOLEAN),
     SETTING("Traffic", "Weather", weather, SETTING_WEATHER),
+    SETTING("Gripline", "Notifications", notifications, SETTING_BOOLEAN),
+    SETTING("Gripline", "SteeringAnimation", steering_animation, SETTING_BOOLEAN),
 };
 
 static const SettingDefinition legacy_settings[] = {
@@ -84,6 +86,7 @@ void settings_defaults(ModOptions *options) {
         .photo_mode_samples = 0,
         .traffic_level = 4,
         .traffic_all_day = 1,
+        .notifications = 1,
     };
 }
 
