@@ -18,7 +18,7 @@ all features of Extra Options are included unchanged – see [README_ORIGINAL.md
 | **Notifications** *(V5)* | Small Gripline cards with the logo at the top right of the game picture – drawn into the game's own image, so they also show in fullscreen. Can be switched off. |
 | **Nitro on keyboard & wheel** *(V5)* | For the mod [NitroSystem](https://github.com/qiangqiang101/NitroSystem) by qiangqiang101: `N` on the keyboard or a free wheel button (function 14) presses its nitro button. Switched off automatically in online sessions. NitroSystem itself is not included. |
 | **Full steering animation** *(V5, experimental, off by default)* | Cockpit: hands hidden, the steering wheel turns up to your wheel's rotation. **Known issue:** the in-game wheel can turn faster than your real wheel (the game drives it with its own steering value) – a fix is planned. Built in (no script any more); the files are made once into `Mount\gripline_cockpit`, game files stay untouched. Applies after a restart. |
-| **Works with fh2wheels** *(V5)* | [fh2wheels](https://github.com/conner-mcvay/fh2-mods) by conner-mcvay (rims, tire widths, ride height, camber) installs and runs next to Gripline. |
+| **fh2wheels compatibility** *(V5, untested)* | [fh2wheels](https://github.com/conner-mcvay/fh2-mods) by conner-mcvay (rims, tire widths, ride height, camber) should install and run next to Gripline (checked in the code, not tested in game yet). |
 | **In-game settings page** | Options › HUD › bottom (or the GRIPLINE tile). All values are saved instantly. Wheel values apply instantly (except "Use Wheel In Game", which needs a restart), weather applies after closing the menu, traffic only after restarting Azimuth (see Known issues). |
 | **More traffic** | Traffic limits up to 100 cars, rush hour all day, presets Original/Calm/Busy/Rush Hour/Chaos. |
 | **Fixed weather** | Sunny, Cloudy, Storm Clouds, Rain or Fog (fog only on Storm Island, sunny elsewhere) – through the game's own weather control, no game files changed. |
@@ -88,7 +88,7 @@ Also tell us your device (controller, keyboard or wheel) and your Azimuth versio
 - **Claude (Anthropic)** – wrote most of the new code in this fork together with Flenkii
 - **Lancaster** (Discord) – tested on a game copy without the Wheel DLL and had the idea "clutch pedal as brake"
 - **[Trinculo54](https://github.com/Trinculo54/fh2-mod-platform)** – FH2 Mod Platform; Gripline uses its MIT API header (`third_party/fh2mod`)
-- Works well with: **[NitroSystem](https://github.com/qiangqiang101/NitroSystem)** by qiangqiang101 (nitro) and **[fh2wheels](https://github.com/conner-mcvay/fh2-mods)** by conner-mcvay (wheels & suspension) – not included, install them yourself
+- Works well with: **[NitroSystem](https://github.com/qiangqiang101/NitroSystem)** by qiangqiang101 (nitro) – not included, install it yourself. **[fh2wheels](https://github.com/conner-mcvay/fh2-mods)** by conner-mcvay (wheels & suspension) should work next to Gripline (checked in the code, not tested in game yet)
 
 ## Known issues
 - **Traffic settings need an Azimuth restart.** `Traffic: Preset` and `Traffic: Amount` in the in-game menu are
