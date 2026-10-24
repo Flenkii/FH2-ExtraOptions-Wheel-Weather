@@ -268,6 +268,11 @@ class Emu:
         return len(value)
 
     # ------------------------------------------------------------- misc kernel32
+    def k_GetModuleHandleW(self):
+        # other mods' modules (e.g. FnFNitro.dll): name -> base, not loaded = 0
+        name = self.wstr(self.arg(0)).lower() if self.arg(0) else ''
+        return getattr(self, 'modules', {}).get(name, 0)
+
     def k_GetTickCount64(self): return self.tick
     def k_Sleep(self): self.tick += self.arg(0)
 

@@ -4,6 +4,7 @@
 #include "game_addresses.h"
 #include "logging.h"
 #include "support.h"
+#include "nitro_link.h"
 
 #define KEY_INI L"FH2_Keyboard.ini"
 #define MAX_PADS 8
@@ -66,6 +67,7 @@ enum {
     KIND_STEER,  /* left stick X: -1 / +1 */
     KIND_NAV,    /* arrows, 0 up, 1 down, 2 left, 3 right: left stick in menus, camera while driving */
     KIND_FIXED,  /* fixed controller input */
+    KIND_NITRO,  /* NitroSystem nitro button, see nitro_link.h */
 };
 
 typedef struct {
@@ -101,6 +103,7 @@ static Binding bindings[] = {
     {L"LookBack", KIND_ACTION, 10, L"C,Num2", {0}},
     {L"LookLeft", KIND_ACTION, 11, L"Num4", {0}},
     {L"LookRight", KIND_ACTION, 12, L"Num6", {0}},
+    {L"Nitro", KIND_NITRO, 0, L"N", {0}},
     {L"Lights", KIND_FIXED, IN_RS, L"L", {0}},
     {L"Map", KIND_FIXED, IN_VIEW, L"M", {0}},
     {L"Pause", KIND_FIXED, IN_MENU, L"Esc", {0}},
@@ -218,7 +221,8 @@ static const char default_ini[] =
     "; Mouse4, Mouse5.\r\n"
     "; Driving functions follow the controller layout chosen in the game.\r\n"
     "; Menus: Enter = A, Backspace = B, Esc = Menu.\r\n"
-    "; Arrow keys: in menus = left stick, while driving = camera (right stick).\r\n";
+    "; Arrow keys: in menus = left stick, while driving = camera (right stick).\r\n"
+    "; Nitro: only with the NitroSystem mod (presses its NitroButton).\r\n";
 
 /* Default file text including the key bindings (also used by ini_migrate.c). Returns the
    length, 0 if it does not fit. */
@@ -422,6 +426,9 @@ static void keyboard_reading(PadReading *r) {
                 break;
             case KIND_FIXED:
                 apply_input(r, b->target, pressed ? 1.0 : 0.0);
+                break;
+            case KIND_NITRO:
+                nitro_link_set(NITRO_SOURCE_KEYBOARD, pressed);
                 break;
             case KIND_ACTION: {
                 int input = controller_action_input(b->target);

@@ -65,6 +65,7 @@ COMMON_SOURCES = [
     "features/weather.c",
     "features/ffb_vm.c",
     "features/keyboard_pad.c",
+    "features/nitro_link.c",
 ]
 
 

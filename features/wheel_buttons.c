@@ -15,6 +15,7 @@
 #include "logging.h"
 #include "support.h"
 #include "video_options_text.h"
+#include "nitro_link.h"
 
 void wheel_log_text(const char *text);
 
@@ -63,16 +64,17 @@ static const signed char function_actions[WHEEL_FUNCTION_COUNT] = {
     [WHEEL_FUNCTION_CLUTCH] = ACTION_CLUTCH,
     [WHEEL_FUNCTION_SHIFT_UP] = ACTION_SHIFT_UP,
     [WHEEL_FUNCTION_SHIFT_DOWN] = ACTION_SHIFT_DOWN,
+    [WHEEL_FUNCTION_NITRO] = -1,
 };
 
 static const wchar_t *const names_german[WHEEL_FUNCTION_COUNT] = {
     L"Aus",          L"Kamera wechseln", L"Blick zurück", L"Blick links",     L"Blick rechts",
     L"Zurückspulen", L"Telemetrie",      L"Fotomodus",    L"Radio: zurück",   L"Radio: weiter",
-    L"Handbremse",   L"Kupplung",        L"Hochschalten", L"Runterschalten"};
+    L"Handbremse",   L"Kupplung",        L"Hochschalten", L"Runterschalten", L"Nitro (NitroSystem)"};
 static const wchar_t *const names_english[WHEEL_FUNCTION_COUNT] = {
     L"Off",    L"Change Camera", L"Look Back",     L"Look Left",      L"Look Right",
     L"Rewind", L"Telemetry",     L"Photo Mode",    L"Radio: Previous", L"Radio: Next",
-    L"Handbrake", L"Clutch",     L"Shift Up",      L"Shift Down"};
+    L"Handbrake", L"Clutch",     L"Shift Up",      L"Shift Down",    L"Nitro (NitroSystem)"};
 
 const wchar_t *wheel_function_name(unsigned char *game_image, unsigned function) {
     if (function >= WHEEL_FUNCTION_COUNT) {
@@ -138,14 +140,14 @@ static void log_table(uint64_t id) {
     static const char *const labels[WHEEL_FUNCTION_COUNT] = {
         "", "Kamera", "Blick zurueck", "Blick links", "Blick rechts", "Zurueckspulen", "Telemetrie",
         "Fotomodus", "Radio zurueck", "Radio weiter", "Handbremse", "Kupplung", "Hochschalten",
-        "Runterschalten"};
+        "Runterschalten", "Nitro"};
     char line[700];
     size_t length = 0;
     char number[4] = {(char)('0' + (id % 100) / 10), (char)('0' + id % 10), 0, 0};
     append(line, sizeof(line), &length, "Spiel laedt Lenkrad-Layout ");
     append(line, sizeof(line), &length, id >= 10 ? number : number + 1);
     append(line, sizeof(line), &length, " - Zusatztasten loesen aus:");
-    for (unsigned f = 1; f < WHEEL_FUNCTION_COUNT; ++f) {
+    for (unsigned f = 1; f < WHEEL_FUNCTION_NITRO; ++f) {
         append(line, sizeof(line), &length, " ");
         append(line, sizeof(line), &length, labels[f]);
         append(line, sizeof(line), &length, "=");
@@ -284,7 +286,8 @@ static float stick_y(void) {
 
 void wheel_buttons_update(unsigned held, unsigned char *byte0, unsigned char *byte1) {
     LONG rs = 0, ly = 0;
-    for (unsigned f = 1; f < WHEEL_FUNCTION_COUNT; ++f) {
+    nitro_link_set(NITRO_SOURCE_WHEEL, (held >> WHEEL_FUNCTION_NITRO) & 1);
+    for (unsigned f = 1; f < WHEEL_FUNCTION_NITRO; ++f) {
         if (!(held & (1u << f))) continue;
         int input = (int)action_input[function_actions[f]];
         unsigned byte;

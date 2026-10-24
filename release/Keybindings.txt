@@ -17,6 +17,7 @@ KAMERA & BLICK / CAMERA & LOOK
   Tab                Kamera wechseln              Change camera
   C oder Num2        Blick zurück                 Look back
   Num4 / Num6        Blick links / rechts         Look left / right
+  N                  Nitro (nur mit NitroSystem)  Nitro (only with NitroSystem)
 
 FUNKTIONEN / FUNCTIONS
   R                  Zurückspulen                 Rewind

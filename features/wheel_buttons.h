@@ -31,6 +31,7 @@ enum {
     WHEEL_FUNCTION_CLUTCH,
     WHEEL_FUNCTION_SHIFT_UP,
     WHEEL_FUNCTION_SHIFT_DOWN,
+    WHEEL_FUNCTION_NITRO, /* NitroSystem, see nitro_link.h - no game action */
     WHEEL_FUNCTION_COUNT
 };
 
