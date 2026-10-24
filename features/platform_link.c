@@ -10,6 +10,8 @@
 #define PAGE_KEY "Settings"
 #define TILE_BACKGROUND 0xFF1D4F91u /* Gripline blue */
 #define TILE_TEXT 0xFFFFFFFFu
+#define TILE_TITLE_TABLE "PauseMenu.str"
+#define TILE_TITLE_KEY 0xF655 /* IDS for the Achievements tile title ("ACHIEVEMENTS" / "ERFOLGE"), all languages */
 
 static const FH2ModApi *api;
 static FH2Mod *mod;
@@ -69,7 +71,15 @@ __declspec(dllexport) int GriplinePlatformAttach(const FH2ModApi *platform) {
                                     sizeof(page_content)) &&
         api->set_page_xaml(mod, PAGE_KEY, page_resources, page_content, NULL)) {
         api->set_page_tile_colors(mod, PAGE_KEY, TILE_BACKGROUND, TILE_TEXT);
-        api->set_page_tile_text(mod, PAGE_KEY, "GRIPLINE " GRIPLINE_VERSION);
+        api->set_page_tile_text(mod, PAGE_KEY, "SETTINGS");
+        if (api->set_string) { /* the tile's big title: ERFOLGE -> GRIPLINE V5 (from fh2mod_init: in time) */
+            static wchar_t title[32];
+            const char *text = "GRIPLINE " GRIPLINE_VERSION;
+            unsigned i = 0;
+            for (; text[i] && i + 1 < ARRAY_COUNT(title); ++i) title[i] = (wchar_t)(unsigned char)text[i];
+            title[i] = 0;
+            api->set_string(mod, TILE_TITLE_TABLE, TILE_TITLE_KEY, title);
+        }
         InterlockedExchange(&page_active, 1);
         api->log(mod, "settings on the pause menu tile (Achievements -> GRIPLINE)");
         log_append("PLATFORM: FH2 Mod Platform found - Gripline settings are on the pause menu "

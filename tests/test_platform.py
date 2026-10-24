@@ -71,6 +71,7 @@ stubs = {
     'set_page_tile_colors': lambda: seen.__setitem__('colors', (e.arg(2) & 0xffffffff, e.arg(3) & 0xffffffff)) or 1,
     'set_page_tile_text': lambda: seen.__setitem__('text', cstr(e.arg(2))) or 1,
     'game_base': lambda: 0,
+    'set_string': lambda: seen.__setitem__('string', (cstr(e.arg(1)), e.arg(2) & 0xffff, e.wstr(e.arg(3)))),
 }
 for n in names:
     e.wq(api + offset[n], e.stub('api_' + n, stubs.get(n, e.missing('api.' + n))))
@@ -82,7 +83,8 @@ check(seen['info'] and seen['info'][0] == 'Gripline' and seen['info'][1] == 'V5'
 check(seen['page'] and seen['page'][0] == 'Settings' and seen['page'][2] == 'Achievements' and seen['page'][3] != 0,
       f'page on the Achievements tile with on_open: {seen["page"]}')
 check(seen['colors'] == (0xFF1D4F91, 0xFFFFFFFF), f'tile colours {seen["colors"]}')
-check(seen['text'] == 'GRIPLINE V5', f'tile text {seen["text"]!r}')
+check(seen['text'] == 'SETTINGS', f'tile text {seen["text"]!r}')
+check(seen.get('string') == ('PauseMenu.str', 0xF655, 'GRIPLINE V5'), f'tile title ERFOLGE -> GRIPLINE V5: {seen.get("string")}')
 check(e.call('GriplinePlatformAttach', api) == 1, 'second attach is ignored')
 
 print('XAML der Kachel-Seite:')
