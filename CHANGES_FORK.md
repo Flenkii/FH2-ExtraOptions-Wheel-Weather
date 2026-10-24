@@ -14,6 +14,12 @@ Fork of https://github.com/RokkuDayo/ForzaHorizon2_ExtraOptions – modified in 
 - `features/ini_migrate.c/.h` – takes the German settings files of fork1-fork3 over into the English ones (fork4)
 - `features/ini_edit.c/.h` – edit INI lines without losing comments
 - `adapters/azimuth_guard.c` – guard against a null pointer while loading under Azimuth
+- `features/nitro_link.c/.h` (V5) – nitro key / wheel button for NitroSystem (only its XInput import), off in online sessions
+- `features/notify.c/.h`, `features/gripline_logo.h` (V5) – notification cards drawn into the game's D3D12 swap chain
+- `features/platform_link.c/.h`, `platform/gripline_mod.c` (V5) – FH2 Mod Platform module (`fh2-mods\Gripline.dll`) and the GRIPLINE tile page
+- `features/cockpit.c/.h` (V5) – full steering animation built in (own Deflate, Oodle1 and GR2 code; port of `tools/fh2_lenkrad.py`)
+- `third_party/fh2mod/` (V5) – the FH2 Mod Platform's API header (MIT, Trinculo54)
+- `assets/` (V5) – Gripline logo
 - `tools/` – Python scripts for the cockpit wheel, More Traffic and traffic variety, `make_release.py`
 - `release/` – `FH2_ExtraOptions.ini`, `README.txt` and `Keybindings.txt` for the release ZIP
 - `tests/` – emulator tests (unicorn)

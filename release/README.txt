@@ -1,4 +1,4 @@
-GRIPLINE V4 – wheel, keyboard, traffic & weather for Forza Horizon 2 (Azimuth)
+GRIPLINE V5 – wheel, keyboard, traffic & weather for Forza Horizon 2 (Azimuth)
 =============================================================================
 Based on Extra Options 0.2.98 by RokkuDayo.
 
@@ -12,45 +12,67 @@ Not supported by the Extra Options author or the Azimuth developer.
 
 1. INSTALLATION
 ---------------
-Copy the files from the "Azimuth" folder into your Azimuth folder (next to azimuth.exe).
+Copy everything from the "Azimuth" folder into your Azimuth folder (next to azimuth.exe):
+winmm.dll, FH2_ExtraOptions.ini and the folder fh2-mods (with Gripline.dll).
 Back up your old winmm.dll and FH2_ExtraOptions.ini first.
+Updating: replacing winmm.dll and fh2-mods\Gripline.dll is enough.
 
 On the first start the mod creates FH2_Wheel.ini (wheel) and FH2_Keyboard.ini (keyboard).
-Everything important can be set in the game: Options > HUD > bottom.
-Updating from fork1-fork3: your old FH2_Lenkrad.ini / FH2_Tastatur.ini are taken over
-automatically into the new English files; the old files go into the folder
-FH2_Settings_Backup.
+Old settings files (FH2_Lenkrad.ini / FH2_Tastatur.ini from fork1-fork3) are taken over
+automatically; the old files go into FH2_Settings_Backup.
+
+Settings in the game:
+  - With the FH2 Mod Platform (comes with FH2MP): pause menu > the blue GRIPLINE tile.
+  - Without it: Options > HUD > bottom.
 
 Without any further steps everything is automatic:
   - The controller works as always.
-  - The keyboard works right away, bindings: see Keybindings.txt (change them in
-    FH2_Keyboard.ini).
-  - A Logitech G920 wheel is detected. Force feedback = the game's original force feedback,
-    like on the Xbox.
-    Works even if your game copy has no Microsoft.Xbox.Input.Wheel.dll (the mod then uses
-    its own version of it).
-  - While a wheel is plugged in, the game drives with the wheel only. To drive with keyboard
-    or controller anyway: set "Wheel: Use Wheel In Game" to Off in the game and restart
-    (or unplug the wheel).
-  - G920 brake pedal too stiff? Use the clutch pedal as brake: in the game
-    "Wheel: Clutch Pedal as Brake" = On (or ClutchAsBrake=1 in FH2_Wheel.ini).
-    Idea: Lancaster.
+  - The keyboard works right away, bindings: see Keybindings.txt (FH2_Keyboard.ini).
+  - A Logitech G920 is detected, with the game's original force feedback like on the Xbox.
+    Works even without Microsoft.Xbox.Input.Wheel.dll.
+  - While a wheel is plugged in, the game drives with the wheel only. For keyboard or
+    controller: "Wheel: Use Wheel In Game" = Off and restart (or unplug the wheel).
+  - G920 brake pedal too stiff? "Wheel: Clutch Pedal as Brake" = On. Idea: Lancaster.
+  - Gripline cards at the top right of the picture tell you what happened (also in
+    fullscreen). Switch: "Gripline: Notifications".
 
 
-1b. PLAYING ONLINE WITH FH2MP  (folder "With FH2MP (online)")
--------------------------------------------------------------
-Same mod, other place. FH2MP (github.com/Charelene/FH2MP) puts its own winmm.dll next to
-azimuth.exe and loads Extra Options from the folder fh2extra:
-  - Install FH2MP with its launcher first.
-  - In the FH2MP launcher settings turn OFF the automatic Extra Options install
-    (otherwise it puts the original Extra Options back).
-  - Copy the folder "fh2extra" from "With FH2MP (online)" into your Azimuth folder
-    (replace the files). Your FH2_Wheel.ini / FH2_Keyboard.ini go into fh2extra too.
+1b. PLAYING ONLINE WITH FH2MP
+-----------------------------
+Gripline's winmm.dll stays next to azimuth.exe, FH2MP comes as a Mod Platform mod
+(fh2-mods\FH2MP.dll):
+  - Install FH2MP with its launcher (it brings the FH2 Mod Platform, d3dcompiler_47.dll).
+  - In the FH2MP launcher settings turn OFF "Install FH2 Extra Options if it is missing"
+    (otherwise it moves Gripline into fh2extra and puts the original Extra Options back).
+  - Copy Gripline's files as in 1.
 Online, traffic and weather come from the session (your settings only apply offline).
-Wheel, keyboard and force feedback work online.
+Wheel, keyboard and force feedback work online. Nitro is switched off online
+automatically (a card tells you) and comes back offline.
+Old layout (Gripline in fh2extra\): not needed any more, the FH2MP launcher moves it.
 
 
-2. OPTIONAL: READY-MADE PROFILES  (folder Optional\Profiles)
+2. NEW IN V5
+------------
+  - GRIPLINE tile in the pause menu (needs the FH2 Mod Platform; fh2-mods\Gripline.dll).
+  - Gripline notification cards with the logo, drawn into the game picture.
+  - Nitro on the keyboard (N) and on a wheel button (function 14 "Nitro") for the mod
+    NitroSystem by qiangqiang101 (https://github.com/qiangqiang101/NitroSystem) – install
+    NitroSystem yourself, Gripline only presses its nitro button. Online: off.
+    Note: NitroSystem's "Backfire on All Cars" lets the Mod Platform rebuild
+    Mount\mediaoverride\Stripped\gamedbRC.slt from the original database. If another mod
+    of yours keeps its database there, leave that option off.
+  - Full steering animation in the cockpit (off by default): hands hidden, the steering
+    wheel turns as far as your real one (Rotation in FH2_Wheel.ini). Switch:
+    "Cockpit: Full Steering Animation", applies after a restart. The first start after
+    switching it on (or changing the rotation) takes a little longer: Gripline makes the
+    files once into Mount\gripline_cockpit (game files are never changed; delete that
+    folder any time).
+  - Works well with fh2wheels by conner-mcvay (rims, tire widths, ride height, camber):
+    https://github.com/conner-mcvay/fh2-mods – its installer finds Gripline as
+    "Extra Options".
+
+
+3. OPTIONAL: READY-MADE PROFILES  (folder Optional\Profiles)
 -----------------------------------------------------------
 Only needed if you don't want to use the in-game menu. Copy both INI files of a profile
 into your Azimuth folder (replaces your FH2_Wheel.ini and FH2_Keyboard.ini):
@@ -67,6 +89,7 @@ Attach these files from your Azimuth folder (next to azimuth.exe):
   - FH2_ExtraOptions.log                    (always)
   - FH2_Wheel.log                           (wheel problems)
   - FH2_Wheel.ini and FH2_Keyboard.ini      (your settings)
+  - fh2-mods\platform.log                   (with FH2MP / the Mod Platform)
 Start the game, reproduce the problem, close the game, then attach the files.
 
 Known issues:
@@ -74,19 +97,21 @@ Known issues:
   - Fog only exists on Storm Island, everywhere else it is sunny.
   - No H-pattern shifter: FH2 only knows shift up / shift down (paddles or E/Q).
 
+Credits: RokkuDayo (Extra Options), Lancaster (clutch as brake), Trinculo54 (FH2 Mod
+Platform API, MIT), qiangqiang101 (NitroSystem), conner-mcvay (fh2wheels).
+
 ----------------------------------------------------------------------------------------
 DEUTSCH (kurz)
-Die Dateien aus "Azimuth" neben azimuth.exe kopieren (vorher die alte winmm.dll sichern).
-Mit FH2MP (online): Ordner "fh2extra" aus "With FH2MP (online)" in den Azimuth-Ordner kopieren
-und im FH2MP-Launcher die automatische Extra-Options-Installation ausschalten.
-Einstellungen: im Spiel unter Optionen > HUD > ganz unten, oder FH2_Wheel.ini /
-FH2_Keyboard.ini. Alte FH2_Lenkrad.ini/FH2_Tastatur.ini werden automatisch übernommen
-(Originale im Ordner FH2_Settings_Backup). Die Tastatur funktioniert sofort, Belegung siehe
-Keybindings.txt. Kupplung als Bremse: im Spiel "Lenkrad: Kupplung als Bremse" auf An
-(oder ClutchAsBrake=1 in FH2_Wheel.ini, oder Profil Wheel_ClutchAsBrake). Idee: Lancaster.
-Das Lenkrad nutzt das originale Force Feedback des Spiels. Ist ein Lenkrad eingesteckt,
-fährt das Spiel nur damit; zum Fahren mit Tastatur/Controller "Lenkrad: Lenkrad im Spiel"
-auf Aus stellen und neu starten. Optional\Profiles: fertige INI-Paare (nur Controller /
-Tastatur / Lenkrad). Keine H-Schaltung: FH2 kennt nur Hoch- und Runterschalten.
-Probleme bitte auf GitHub unter "Issues" melden und FH2_ExtraOptions.log, FH2_Wheel.log
-(bei Lenkrad-Problemen), FH2_Wheel.ini und FH2_Keyboard.ini anhängen (neben azimuth.exe).
+Alles aus "Azimuth" neben azimuth.exe kopieren (winmm.dll, FH2_ExtraOptions.ini, Ordner
+fh2-mods). Vorher die alte winmm.dll sichern.
+Mit FH2MP (online): FH2MP über seinen Launcher installieren und dort "Install FH2 Extra
+Options if it is missing" ausschalten. Gripline bleibt neben azimuth.exe. Online ist Nitro
+automatisch aus.
+Einstellungen: im Pausemenü die blaue Kachel GRIPLINE (mit Mod Platform/FH2MP), sonst
+Optionen > HUD > ganz unten, oder FH2_Wheel.ini / FH2_Keyboard.ini / FH2_ExtraOptions.ini
+[Gripline].
+Neu in V5: Gripline-Kachel, Benachrichtigungen im Bild, Nitro auf N bzw. Lenkradtaste
+(Funktion 14, braucht NitroSystem), volle Lenkrad-Animation im Cockpit (Standard aus,
+wirkt nach Neustart; der erste Start danach dauert etwas länger), passt zu fh2wheels.
+Probleme bitte auf GitHub unter "Issues" melden und FH2_ExtraOptions.log, FH2_Wheel.log,
+FH2_Wheel.ini, FH2_Keyboard.ini und fh2-mods\platform.log anhängen.
