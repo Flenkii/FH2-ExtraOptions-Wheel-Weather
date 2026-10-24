@@ -68,6 +68,7 @@ COMMON_SOURCES = [
     "features/nitro_link.c",
     "features/notify.c",
     "features/platform_link.c",
+    "features/cockpit.c",
 ]
 
 

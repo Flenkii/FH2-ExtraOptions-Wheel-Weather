@@ -4,6 +4,7 @@
 #include "features/keyboard_pad.h"
 #include "features/nitro_link.h"
 #include "features/notify.h"
+#include "features/cockpit.h"
 #include "features/rig_settings.h"
 #include "features/video_settings.h"
 #include "logging.h"
@@ -74,6 +75,7 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
     if (initialized && options.enabled) {
         initialized = verify_game_file(executable_path);
     }
+    media_overrides_configure(options.media_overrides, options.steering_animation);
     if (initialized) {
         initialized = patch_engine_apply(game_image, &options);
     }
@@ -97,6 +99,17 @@ int runtime_initialize(unsigned char *game_image, const wchar_t *executable_path
         wheel_bridge_start(game_image, executable_path, settings_directory);
         keyboard_pad_game_start(game_image, settings_directory);
         nitro_link_start(game_image);
+        if (options.steering_animation) {
+            static wchar_t mount_dir[PATH_CAPACITY];
+            size_t n = 0, cut = 0;
+            for (; executable_path[n] && n + 1 < PATH_CAPACITY; ++n) {
+                mount_dir[n] = executable_path[n];
+                if (executable_path[n] == L'\\' || executable_path[n] == L'/') cut = n;
+            }
+            mount_dir[cut] = 0; /* the Mount folder holds forza_durango_release_final.exe */
+            cockpit_start(mount_dir, 1, wheel_bridge_setting(RIG_WHEEL_ROTATION),
+                          wheel_bridge_setting(RIG_WHEEL_CURVE));
+        }
         notify_set_enabled(options.notifications);
         rig_settings_gripline(options.notifications, options.steering_animation);
         rig_settings_start(settings_directory);

@@ -1,0 +1,22 @@
+#ifndef FH2_COCKPIT_H
+#define FH2_COCKPIT_H
+
+/* Full steering animation in the cockpit ([Gripline] SteeringAnimation=1, default off).
+
+   Same result as the V1 script tools/fh2_lenkrad.py, now built into Gripline:
+   - the driver models (media\drivers\{default,defaultRace,suited,unsuited,stig}.zip) get the
+     hands hidden (their triangles collapsed),
+   - every car's driver steering animation (scene\Drivers\...\leftRightTurn.gr2) gets a new
+     steering-wheel curve that turns as far as the real wheel (FH2_Wheel.ini Rotation / 2 per
+     side; FH2 itself turns it 90 degrees).
+   The files are made once (again only when the rotation changes) into Mount\gripline_cockpit,
+   which Gripline mounts over game:\media while the option is on. The game files are never
+   changed; switching the option off simply leaves the folder unmounted. */
+
+/* Game start: makes the files if needed (own thread). mount_dir = the game's Mount folder. */
+void cockpit_start(const wchar_t *mount_dir, int enabled, int rotation_degrees, int curve_x10);
+
+/* For the mount: 1 = mount the folder, 0 = not. Waits (up to 60 s) until the files are made. */
+int cockpit_wait_ready(void);
+
+#endif

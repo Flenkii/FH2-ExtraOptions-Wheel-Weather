@@ -1,6 +1,7 @@
 #include "features.h"
 #include "logging.h"
 #include "support.h"
+#include "cockpit.h"
 
 typedef struct {
     const char *data;
@@ -25,6 +26,12 @@ static ConstructVolume construct_volume;
 static FileExists original_exists;
 static void *folder_vtable[1 + 0x1f0 / sizeof(void *)];
 static volatile LONG mount_state;
+static int mount_overrides = 1, mount_cockpit;
+
+void media_overrides_configure(int overrides, int cockpit) {
+    mount_overrides = overrides;
+    mount_cockpit = cockpit;
+}
 static unsigned char original_pointer[8], callback_pointer[8];
 static const unsigned char *const accepted[] = {original_pointer, callback_pointer};
 
@@ -70,8 +77,17 @@ static void ensure_folders_mounted(void *filesystem) {
         InterlockedCompareExchange(&mount_state, 1, 0) != 0) {
         return;
     }
-    int override = mount_folder(filesystem, "game:\\mediaoverride\\", 0x7ffffffe);
-    int pc = mount_folder(filesystem, "game:\\mediapc\\", 0x7ffffffd);
+    int override = 1, pc = 1;
+    if (mount_overrides) {
+        override = mount_folder(filesystem, "game:\\mediaoverride\\", 0x7ffffffe);
+        pc = mount_folder(filesystem, "game:\\mediapc\\", 0x7ffffffd);
+    }
+    if (mount_cockpit && cockpit_wait_ready()) {
+        /* Gripline steering animation (cockpit.c): below mediaoverride, above the game */
+        log_append(mount_folder(filesystem, "game:\\gripline_cockpit\\", 0x7ffffffc)
+                       ? "FILES: Gripline cockpit folder mounted (full steering animation).\r\n"
+                       : "FILES: Gripline cockpit folder could not be mounted.\r\n");
+    }
     void **methods = *(void ***)filesystem;
     ((SortVolumes)methods[0x1f8 / 8])(filesystem);
     InterlockedExchange(&mount_state, 2);

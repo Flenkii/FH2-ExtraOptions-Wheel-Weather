@@ -57,3 +57,4 @@ EXPORTS
     FileTimeToLocalFileTime
     CreateDirectoryW
     CopyFileW
+    SetFilePointerEx

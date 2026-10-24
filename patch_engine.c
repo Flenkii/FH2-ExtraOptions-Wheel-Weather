@@ -105,8 +105,8 @@ static int patch_group_enabled(PatchGroup group, const ModOptions *options) {
             return options->all_rims_category;
         case GROUP_BOOT_CAR_MEET:
             return options->skip_car_meet_on_startup;
-        case GROUP_MEDIA_OVERRIDES:
-            return options->media_overrides;
+        case GROUP_MEDIA_OVERRIDES: /* also Gripline's cockpit folder */
+            return options->media_overrides || options->steering_animation;
         case GROUP_MINIMAP:
             return 1;
         case GROUP_FRONTEND_XML:

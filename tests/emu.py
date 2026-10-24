@@ -130,12 +130,14 @@ class Emu:
     # ------------------------------------------------------------- files
     def host(self, wpath):
         p = wpath.replace('/', '\\')
+        if p.lower().rstrip('\\') in ('c:\\test', 'c:'):
+            return self.root
         assert p.lower().startswith('c:\\test\\'), p
         return os.path.join(self.root, *p[8:].split('\\'))
 
     def k_CreateFileW(self):
         path = self.host(self.wstr(self.arg(0)))
-        access, disposition = self.arg(1), self.arg(4)
+        access, disposition = self.arg(1) & 0xffffffff, self.arg(4) & 0xffffffff  # DWORDs
         exists = os.path.exists(path)
         if disposition == 3 and not exists:  # OPEN_EXISTING
             self.last_error = 2
