@@ -407,7 +407,7 @@ static int register_properties(unsigned page) {
     }
     initialized_image = image;
     registered_image[page] = image;
-    log_append(page == HUD_PAGE ? "HUD: drift, FOV, extra controls and Lenkrad & Verkehr added "
+    log_append(page == HUD_PAGE ? "HUD: drift, FOV, extra controls and Gripline settings added "
                                   "to the native HUD menu.\r\n"
                                 : "VIDEO: graphics controls added to the native Video menu.\r\n");
     return 1;

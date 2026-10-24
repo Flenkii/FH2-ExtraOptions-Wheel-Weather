@@ -2588,7 +2588,7 @@ void wheel_bridge_start(unsigned char *game_image, const wchar_t *executable_pat
     }
     HANDLE file = CreateFileW(log_path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
-    wlog("FH2 Lenkrad-Bruecke (inoffiziell) v0.1 - Enabled=%d Rotation=%d Shifter=%d", cfg.enabled, cfg.rotation,
+    wlog("Gripline " GRIPLINE_VERSION " wheel bridge - Enabled=%d Rotation=%d Shifter=%d", cfg.enabled, cfg.rotation,
          cfg.shifter);
     if (!cfg.enabled) {
         wlog("Ausgeschaltet in FH2_Wheel.ini (Enabled=0).");

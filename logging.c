@@ -76,9 +76,9 @@ void log_start(const wchar_t *directory, const ModOptions *options) {
         return;
     }
 #ifdef FH2_AZIMUTH
-    write_text(file, MOD_NAME " " MOD_VERSION " - Azimuth winmm proxy\r\n");
+    write_text(file, "Gripline " GRIPLINE_VERSION " (based on " MOD_NAME " " MOD_VERSION ") - Azimuth winmm proxy\r\n");
 #else
-    write_text(file, MOD_NAME " " MOD_VERSION " - xg.dll hook\r\n");
+    write_text(file, "Gripline " GRIPLINE_VERSION " (based on " MOD_NAME " " MOD_VERSION ") - xg.dll hook\r\n");
 #endif
     write_text(file, status_get());
     for (size_t index = 0; index < setting_count; ++index) {

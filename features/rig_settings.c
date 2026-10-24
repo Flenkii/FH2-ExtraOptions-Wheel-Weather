@@ -795,13 +795,13 @@ void rig_settings_start(const wchar_t *settings_directory) {
     }
     HANDLE thread = CreateThread(NULL, 0, saver_thread, NULL, 0, NULL);
     if (!thread) {
-        log_append("MENU: Lenkrad & Verkehr - could not start the save thread; menu changes stay "
+        log_append("MENU: Gripline - could not start the save thread; menu changes stay "
                    "until the game closes.\r\n");
         return;
     }
     CloseHandle(thread);
     started = 1;
-    log_append("MENU: Lenkrad & Verkehr page ready (HUD options); changes apply live and are "
+    log_append("MENU: Gripline page ready (HUD options); changes apply live and are "
                "saved to FH2_Wheel.ini / FH2_Keyboard.ini / FH2_ExtraOptions.ini.\r\n");
 }
 
